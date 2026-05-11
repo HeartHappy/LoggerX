@@ -318,6 +318,7 @@ internal object LogDbManager {
 
     private var autoCleanFuture: java.util.concurrent.ScheduledFuture<*>? = null
     private var autoCleanBySizeFuture: java.util.concurrent.ScheduledFuture<*>? = null
+    private var autoCleanByLowMemoryFuture: java.util.concurrent.ScheduledFuture<*>? = null
 
     fun startAutoCleanByDate(retentionDays: Int) {
         if (retentionDays <= 0) return
@@ -333,6 +334,14 @@ internal object LogDbManager {
         autoCleanBySizeFuture = scheduledExecutor.scheduleWithFixedDelay({
             runCatching { performCleanupBySize(maxSizeMb, cleanSizeMb) }.onFailure { Log.e(LoggerX.TAG, "Auto clean by size failed: ${it.message}") }
         }, 0, 24, TimeUnit.HOURS)
+    }
+
+    fun startAutoCleanByLowMemory(minFreeSpaceMb: Double) {
+        if (minFreeSpaceMb <= 0) return
+        autoCleanByLowMemoryFuture?.cancel(false)
+        autoCleanByLowMemoryFuture = scheduledExecutor.scheduleWithFixedDelay({
+            runCatching { performCleanupByLowMemory(minFreeSpaceMb) }.onFailure { Log.e(LoggerX.TAG, "Auto clean by low memory failed: ${it.message}") }
+        }, 0, 30, TimeUnit.MINUTES)
     }
 
     private fun performCleanupByDateRange(days: Int) {
@@ -390,6 +399,45 @@ internal object LogDbManager {
                 }
             }
             currentSizeMb = dbFile.length().toDouble() / (1024.0 * 1024.0)
+        }
+    }
+
+    private fun performCleanupByLowMemory(minFreeSpaceMb: Double) {
+        val dbFile = ContextHolder.getAppContext().getDatabasePath(LogDbHelper.DB_NAME)
+        val dir = dbFile.parentFile ?: return
+        if (!dir.exists()) return
+
+        var freeSpaceMb = dir.usableSpace.toDouble() / (1024.0 * 1024.0)
+        var loop = 0 // Limit loop to avoid infinite loop
+        while (freeSpaceMb < minFreeSpaceMb && loop < 30) {
+            loop++
+            var globalOldestDate: String? = null
+            val tables = getAllLogTables()
+
+            // Find the globally oldest date across all log tables
+            tables.forEach { tableName ->
+                val sql = "SELECT min(substr(${LoggerX.COLUMN_TIME}, 1, 10)) FROM $tableName"
+                database.rawQuery(sql, null).use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val date = cursor.getString(0)
+                        if (date != null) {
+                            if (globalOldestDate == null || date < globalOldestDate!!) {
+                                globalOldestDate = date
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we found an oldest date, delete all records from that date
+            if (globalOldestDate != null) {
+                tables.forEach { tableName ->
+                    deleteLogsByDate(tableName, globalOldestDate)
+                } // Update free space
+                freeSpaceMb = dir.usableSpace.toDouble() / (1024.0 * 1024.0)
+            } else { // No more logs to delete
+                break
+            }
         }
     }
 

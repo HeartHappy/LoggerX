@@ -11,8 +11,8 @@ class MyApp: Application() {
         LoggerX.init(this)
         LoggerX.registerScope(LogInterceptorAdapter(), CUSTOM_SCOPE)
         ScreenAdaptHelper.setup(this) // 开启按日期自动清理，保留 7 天数据
-        //        LoggerX.enableAutoClean(3)
-
+        LoggerX.enableAutoClean(7)
+        LoggerX.enableAutoCleanByLowMemory(55.96*1024)
         // 开启按文件大小自动清理，最大 1MB，每次清理 0.2MB
         //        LoggerX.enableAutoClean(1.0, 0.5)
     }

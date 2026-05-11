@@ -13,11 +13,11 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
-class MainActivity : AppCompatActivity() {
+class MainActivity: AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var logCount = 0
 
-    private val logRunnable = object : Runnable {
+    private val logRunnable = object: Runnable {
         override fun run() {
             val message = "测试日志消息 $logCount - ${System.currentTimeMillis()}"
             LoggerX.COMMON.i("testMethod:$message")
@@ -29,12 +29,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState : Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         // 启动循环插入日志
-      //handler.post(logRunnable)
+        handler.post(logRunnable)
 
         val dbFileSize = LoggerX.getDbFileSize()
         LoggerX.COMMON.i("onCreate: $dbFileSize")
@@ -51,8 +51,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    fun outLogAndFile(view : View) {
-        // Log common test messages
+    fun outLogAndFile(view: View) { // Log common test messages
         LoggerX.COMMON.d("common test")
         LoggerX.COMMON.d("common onCreate d")
         LoggerX.COMMON.i("common onCreate i")
@@ -83,23 +82,23 @@ class MainActivity : AppCompatActivity() {
         LoggerX.COMMON.image(copyResourceToTempFile(R.mipmap.test2, "test2.jpg"), message = "壁纸图2：")
     }
 
-    fun deleteLogFile(view : View) {
+    fun deleteLogFile(view: View) {
         val kernelRows = LoggerX.KERNEL.deleteLogs()
         val commonRows = LoggerX.ERROR.deleteLogs()
         Toast.makeText(this, "已删除 KERNEL:$kernelRows, ERROR:$commonRows", Toast.LENGTH_SHORT).show()
     }
 
-    fun deleteAllLogFile(view : View) {
+    fun deleteAllLogFile(view: View) {
         val clearAll = LoggerX.clear()
         LoggerX.COMMON.d("已清空所有日志")
     }
 
-    fun openFile(view : View) {
+    fun openFile(view: View) {
         LoggerX.KERNEL.doExportAndShare(exportAll = false, limit = 500)
         Toast.makeText(this, "已从数据库导出最近日志并调用分享", Toast.LENGTH_SHORT).show()
     }
 
-    fun queryDBLogs(view : View) {
+    fun queryDBLogs(view: View) {
         val distinctValues = LoggerX.IMPORTANT.getDistinctValues(LoggerX.COLUMN_METHOD)
         LoggerX.COMMON.d("queryDBLogs: ${distinctValues.toList()}")
         val queryLogs = LoggerX.IMPORTANT.queryLogs(isAsc = false)
@@ -107,7 +106,7 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(this, PreviewLogActivity::class.java))
     }
 
-    fun shareFile(view : View) {
+    fun shareFile(view: View) {
         LoggerX.COMMON.i("测试==========")
         LoggerX.COMMON.doExportAndShare()
         LoggerX.exportAndShareAll {
@@ -115,7 +114,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun copyResourceToTempFile(resId : Int, fileName : String) : File {
+    private fun copyResourceToTempFile(resId: Int, fileName: String): File {
         val target = File(externalCacheDir, fileName)
         if (target.exists()) return target
         resources.openRawResource(resId).use { input ->

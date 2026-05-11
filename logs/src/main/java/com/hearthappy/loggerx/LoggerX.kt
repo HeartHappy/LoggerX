@@ -142,5 +142,13 @@ class LoggerX {
             LogDbManager.startAutoCleanBySize(maxSizeMb, cleanSizeMb)
         }
 
+        /**
+         * 开启数据库日志自动清理功能（按设备可用存储空间/内存）
+         * @param minFreeSpaceMb 最小可用空间界限 (MB)，当可用空间低于该值时，自动清理最老一天的数据
+         */
+        fun enableAutoCleanByLowMemory(minFreeSpaceMb: Double = 100.0) {
+            LogDbManager.startAutoCleanByLowMemory(minFreeSpaceMb)
+        }
+
     }
 }
