@@ -124,6 +124,30 @@ class LogDbManagerAndroidTest {
     }
 
     @Test
+    fun queryLogsPage_withAnchor_shouldStayStableWhenNewRowsInserted() {
+        val scope = "AnchorPagingScope"
+        repeat(8) { index ->
+            LogDbManager.insertLog(scope, "INFO", "Tag", "method()", "anchor-$index")
+        }
+        val firstPage = LogDbManager.queryLogsPageAdvanced(scopeTag = scope, page = 1, limit = 5)
+        LogDbManager.insertLog(scope, "INFO", "Tag", "method()", "anchor-new")
+        val secondPage = LogDbManager.queryLogsPageAdvanced(
+            scopeTag = scope,
+            page = 2,
+            limit = 5,
+            anchorTime = firstPage.nextAnchorTime,
+            anchorId = firstPage.nextAnchorId
+        )
+        val merged = (firstPage.rows + secondPage.rows)
+            .map { it[LoggerX.COLUMN_MESSAGE].toString() }
+            .toSet()
+        assertEquals(8, merged.size)
+        assertFalse(merged.contains("anchor-new"))
+        assertTrue(merged.contains("anchor-7"))
+        assertTrue(merged.contains("anchor-0"))
+    }
+
+    @Test
     fun upgrade_shouldDropLegacyImgChunkTables() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
         val dbPath = context.getDatabasePath("hearthappy_logs.db")

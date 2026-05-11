@@ -3,6 +3,7 @@ package com.hearthappy.loggerx.preview
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.hearthappy.loggerx.LoggerX
 import com.hearthappy.loggerx.core.DataQueryService
 import com.hearthappy.loggerx.core.LogScopeProxy
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ data class DistinctValuesUiState(
 
 class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
     private var currentQueryHandle: DataQueryService.QueryHandle? = null
+    private var activeQueryId: String? = null
     private val _appliedState = MutableStateFlow(FilterState.EMPTY)
     val appliedState: StateFlow<FilterState> = _appliedState.asStateFlow()
 
@@ -52,12 +54,22 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
     private val _toastEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val toastEvent: SharedFlow<String> = _toastEvent.asSharedFlow()
 
+    private var nextAnchorTime: String? = null
+    private var nextAnchorId: Int? = null
+
     fun loadInitialLogs() {
         queryWithState(_appliedState.value)
     }
 
     fun refreshAppliedLogs() {
         queryWithState(_appliedState.value)
+    }
+
+    fun loadMoreLogs() {
+        if (_logUiState.value.loading || !_logUiState.value.hasMore) return
+        val anchorTime = nextAnchorTime ?: return
+        val anchorId = nextAnchorId ?: return
+        queryWithState(_appliedState.value, isLoadMore = true, anchorTime = anchorTime, anchorId = anchorId)
     }
 
     fun startFilterEditing() {
@@ -102,6 +114,7 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
     }
 
     fun cancelCurrentQuery() {
+        activeQueryId = null
         currentQueryHandle?.cancel()
         currentQueryHandle = null
         _logUiState.update {
@@ -146,8 +159,13 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
         }
     }
 
-    private fun queryWithState(state: FilterState) {
+    private fun queryWithState(state: FilterState, isLoadMore: Boolean = false, anchorTime: String? = null, anchorId: Int? = null) {
+        activeQueryId = null
         currentQueryHandle?.cancel()
+        if (!isLoadMore) {
+            nextAnchorTime = null
+            nextAnchorId = null
+        }
         val keepInBackground = _logUiState.value.keepInBackground
         _logUiState.update {
             it.copy(
@@ -159,7 +177,8 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
             )
         }
         val params = FilterQueryHelper.buildQueryParams(state, page = 1, limit = 100)
-        currentQueryHandle = scopeProxy.queryLogsAsync(
+        val requestPage = if (isLoadMore) 2 else 1
+        val handle = scopeProxy.queryLogsAsync(
             time = params.time,
             tag = params.tag,
             level = params.level,
@@ -167,10 +186,13 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
             isImage = params.isImage,
             keyword = null,
             isAsc = false,
-            page = params.page,
-            limit = params.limit?:100,
+            page = requestPage,
+            limit = params.limit ?: 100,
+            anchorTime = anchorTime,
+            anchorId = anchorId,
             listener = object : DataQueryService.QueryListener {
                 override fun onProgress(progress: DataQueryService.QueryProgress) {
+                    if (progress.queryId != activeQueryId) return
                     viewModelScope.launch {
                         _logUiState.update {
                             it.copy(
@@ -184,20 +206,33 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
                 }
 
                 override fun onSuccess(result: DataQueryService.QueryResult) {
+                    if (result.queryId != activeQueryId) return
                     viewModelScope.launch {
                         val filtered = result.pageResult.rows.filter { FilterQueryHelper.matches(it, state) }
-                        _logUiState.value = _logUiState.value.copy(
-                            logs = filtered,
-                            loading = false,
-                            progressPercent = 100,
-                            progressStage = if (result.fromCache) "cache-hit" else "done",
-                            canCancel = false,
-                            hasMore = result.pageResult.hasMore
-                        )
+                        _logUiState.update { currentState ->
+                            val newLogs = if (isLoadMore) {
+                                (currentState.logs + filtered).distinctBy { row ->
+                                    row[LoggerX.COLUMN_ID]?.toString().orEmpty()
+                                }
+                            } else {
+                                filtered
+                            }
+                            currentState.copy(
+                                logs = newLogs,
+                                loading = false,
+                                progressPercent = 100,
+                                progressStage = if (result.fromCache) "cache-hit" else "done",
+                                canCancel = false,
+                                hasMore = result.pageResult.hasMore
+                            )
+                        }
+                        nextAnchorTime = result.pageResult.nextAnchorTime
+                        nextAnchorId = result.pageResult.nextAnchorId
                     }
                 }
 
                 override fun onError(queryId: String, throwable: Throwable) {
+                    if (queryId != activeQueryId) return
                     viewModelScope.launch {
                         _logUiState.update {
                             it.copy(
@@ -211,6 +246,7 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
                 }
 
                 override fun onCancelled(queryId: String) {
+                    if (queryId != activeQueryId) return
                     viewModelScope.launch {
                         _logUiState.update {
                             it.copy(
@@ -223,9 +259,10 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
                     }
                 }
             }
-        ).also {
-            it.setBackgroundContinue(keepInBackground)
-        }
+        )
+        currentQueryHandle = handle
+        activeQueryId = handle.queryId
+        handle.setBackgroundContinue(keepInBackground)
     }
 
     class Factory(private val scopeProxy: LogScopeProxy) : ViewModelProvider.Factory {

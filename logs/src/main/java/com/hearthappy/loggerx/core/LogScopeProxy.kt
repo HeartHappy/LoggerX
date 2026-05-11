@@ -46,8 +46,8 @@ class LogScopeProxy(private val scope: String): LogScope {
         return LogDbManager.queryLogsAdvanced(scope, time, tag, level, method, isImage, keyword, isAsc, page, limit)
     }
 
-    fun queryLogsAsync(time: String? = null, tag: String? = null, level: String? = null, method: String? = null, isImage: Boolean? = null, keyword: String? = null, isAsc: Boolean = false, page: Int = 1, limit: Int = 100, includeImagePayload: Boolean = false, listener: DataQueryService.QueryListener): DataQueryService.QueryHandle {
-        return DataQueryService.queryAsync(scopeTag = scope, request = DataQueryService.QueryRequest(time = time, tag = tag, level = level, method = method, isImage = isImage, keyword = keyword, sortAsc = isAsc, page = page, pageSize = limit, includeImagePayload = includeImagePayload), listener = listener)
+    fun queryLogsAsync(time: String? = null, tag: String? = null, level: String? = null, method: String? = null, isImage: Boolean? = null, keyword: String? = null, isAsc: Boolean = false, page: Int = 1, limit: Int = 100, anchorTime: String? = null, anchorId: Int? = null, includeImagePayload: Boolean = false, listener: DataQueryService.QueryListener): DataQueryService.QueryHandle {
+        return DataQueryService.queryAsync(scopeTag = scope, request = DataQueryService.QueryRequest(time = time, tag = tag, level = level, method = method, isImage = isImage, keyword = keyword, sortAsc = isAsc, page = page, pageSize = limit, anchorTime = anchorTime, anchorId = anchorId, includeImagePayload = includeImagePayload), listener = listener)
     }
 
     fun getDistinctValues(columnName: String): List<String> {
@@ -120,7 +120,8 @@ class LogScopeProxy(private val scope: String): LogScope {
             val totalMs = nsToMs(System.nanoTime() - startNs)
             recordFileWritePerf(totalMs, false)
             Log.e(LoggerX.TAG, "File write failed: ${e.userMessage}", e)
-            throw e
+            // 返回一个默认的无效Entry，避免抛出异常导致应用程序崩溃
+            return FileLogEntry(id = -1, time = "", level = LogLevel.INFO.value, tag = classTag, method = methodName, message = "File write failed: ${e.userMessage}", filePath = "")
         }
     }
 

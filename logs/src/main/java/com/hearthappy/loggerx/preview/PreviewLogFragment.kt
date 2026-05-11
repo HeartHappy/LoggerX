@@ -24,13 +24,13 @@ import com.hearthappy.basic.ext.showAtBottom
 import com.hearthappy.basic.ext.showAtCenter
 import com.hearthappy.basic.tools.SlideDirection
 import com.hearthappy.loggerx.LoggerX
-import com.hearthappy.loggerx.core.LogScopeProxy
-import com.hearthappy.loggerx.image.LogImageLoaderFactory
 import com.hearthappy.loggerx.R
+import com.hearthappy.loggerx.core.LogScopeProxy
 import com.hearthappy.loggerx.databinding.FragmentLoggerxPreviewBinding
 import com.hearthappy.loggerx.databinding.PopLoggerxHintBinding
 import com.hearthappy.loggerx.databinding.PopMultiFilterBinding
 import com.hearthappy.loggerx.databinding.PopOperationChoiceBinding
+import com.hearthappy.loggerx.image.LogImageLoaderFactory
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -45,7 +45,7 @@ class PreviewLogFragment: AbsBaseFragment<FragmentLoggerxPreviewBinding>() {
     private var isConfirmed = false
     private val streamlineStateViewModel by activityViewModels<PreviewOperateViewModel>()
 
-    override fun initViewBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentLoggerxPreviewBinding? {
+    override fun initViewBinding(inflater: LayoutInflater, container: ViewGroup?): FragmentLoggerxPreviewBinding {
         return FragmentLoggerxPreviewBinding.inflate(inflater, container, false)
     }
 
@@ -85,6 +85,22 @@ class PreviewLogFragment: AbsBaseFragment<FragmentLoggerxPreviewBinding>() {
                     LogImageLoaderFactory.pauseDecode()
                 } else {
                     LogImageLoaderFactory.resumeDecode()
+                }
+            }
+
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                if (dy > 0) { // 向下滑动
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val visibleItemCount = layoutManager.childCount
+                    val totalItemCount = layoutManager.itemCount
+                    val pastVisibleItems = layoutManager.findFirstVisibleItemPosition()
+
+                    if (!viewModel.logUiState.value.loading && viewModel.logUiState.value.hasMore) {
+                        if ((visibleItemCount + pastVisibleItems) >= totalItemCount - 5) { // 提前5个项开始加载
+                            viewModel.loadMoreLogs()
+                        }
+                    }
                 }
             }
         })

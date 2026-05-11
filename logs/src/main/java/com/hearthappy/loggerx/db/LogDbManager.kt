@@ -101,13 +101,14 @@ internal object LogDbManager {
         return queryLogsPageAdvanced(scopeTag = scopeTag, time = time, tag = tag, level = level, method = method, isImage = isImage, keyword = keyword, isAsc = isAsc, page = page, limit = limit).rows
     }
 
-    fun queryLogsPageAdvanced(scopeTag: String, time: String? = null, tag: String? = null, level: String? = null, method: String? = null, isImage: Boolean? = null, keyword: String? = null, isAsc: Boolean = false, page: Int = 1, limit: Int = 100, maxPageBytes: Int = 1024 * 1024): QueryPageResult {
+    fun queryLogsPageAdvanced(scopeTag: String, time: String? = null, tag: String? = null, level: String? = null, method: String? = null, isImage: Boolean? = null, keyword: String? = null, isAsc: Boolean = false, page: Int = 1, limit: Int = 100, maxPageBytes: Int = 1024 * 1024, anchorTime: String? = null, anchorId: Int? = null): QueryPageResult {
         val tableName = getTableName(scopeTag)
         if (!tableExists(tableName)) {
             return QueryPageResult(emptyList(), 0, page, limit, null, 0, false, emptyList())
         }
         val whereParts = mutableListOf<String>()
         val args = mutableListOf<String>()
+        val usingAnchor = !anchorTime.isNullOrBlank() && anchorId != null
         time?.let {
             whereParts += "s.${LoggerX.COLUMN_TIME} LIKE ?"
             args += "$it%"
@@ -135,10 +136,25 @@ internal object LogDbManager {
                 "IFNULL(s.${LoggerX.COLUMN_FILE_PATH}, '') = ''"
             }
         }
+        if (usingAnchor) {
+            whereParts += if (isAsc) {
+                "(s.${LoggerX.COLUMN_TIME} > ? OR (s.${LoggerX.COLUMN_TIME} = ? AND s.${LoggerX.COLUMN_ID} > ?))"
+            } else {
+                "(s.${LoggerX.COLUMN_TIME} < ? OR (s.${LoggerX.COLUMN_TIME} = ? AND s.${LoggerX.COLUMN_ID} < ?))"
+            }
+            args += anchorTime.orEmpty()
+            args += anchorTime.orEmpty()
+            args += anchorId.toString()
+        }
         val where = if (whereParts.isEmpty()) "" else "WHERE ${whereParts.joinToString(" AND ")}"
         val order = if (isAsc) "ASC" else "DESC"
         val offset = maxOf(0, (page - 1) * limit)
-        val limitSql = "LIMIT $limit OFFSET $offset"
+        val sqlLimit = (limit.coerceAtLeast(1) + 1)
+        val limitSql = if (usingAnchor) {
+            "LIMIT $sqlLimit"
+        } else {
+            "LIMIT $sqlLimit OFFSET $offset"
+        }
         val sql = """
             SELECT
                 s.${LoggerX.COLUMN_ID},
@@ -161,15 +177,21 @@ internal object LogDbManager {
         return runCatching {
             val result = mutableListOf<Map<String, Any>>()
             var bytes = 0
+            var hasMore = false
             val db = database
             val totalCount = db.rawQuery(countSql, args.toTypedArray()).use { cursor ->
                 if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
             db.rawQuery(sql, args.toTypedArray()).use { cursor ->
                 while (cursor.moveToNext()) {
+                    if (result.size >= limit) {
+                        hasMore = true
+                        break
+                    }
                     val row = cursorToMap(cursor)
                     val rowBytes = estimateRowBytes(row)
                     if (result.isNotEmpty() && bytes + rowBytes > maxPageBytes) {
+                        hasMore = true
                         break
                     }
                     result += row
@@ -177,7 +199,19 @@ internal object LogDbManager {
                 }
             }
             val loadedCount = offset + result.size
-            QueryPageResult(rows = result, totalCount = totalCount, page = page, limit = limit, nextPage = if (loadedCount < totalCount && result.isNotEmpty()) page + 1 else null, approxBytes = bytes, hasMore = loadedCount < totalCount, queryPlan = emptyList())
+            val lastRow = result.lastOrNull()
+            QueryPageResult(
+                rows = result,
+                totalCount = totalCount,
+                page = page,
+                limit = limit,
+                nextPage = if (!usingAnchor && (hasMore || loadedCount < totalCount) && result.isNotEmpty()) page + 1 else null,
+                approxBytes = bytes,
+                hasMore = if (usingAnchor) hasMore else (hasMore || loadedCount < totalCount),
+                queryPlan = emptyList(),
+                nextAnchorTime = lastRow?.get(LoggerX.COLUMN_TIME)?.toString(),
+                nextAnchorId = lastRow?.get(LoggerX.COLUMN_ID)?.toString()?.toIntOrNull()
+            )
         }.getOrElse {
             Log.e(LoggerX.TAG, "queryLogsPageAdvanced failed: ${it.message}")
             QueryPageResult(emptyList(), 0, page, limit, null, 0, false, emptyList())

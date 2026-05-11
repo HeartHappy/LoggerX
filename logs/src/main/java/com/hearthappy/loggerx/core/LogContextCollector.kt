@@ -58,21 +58,60 @@ object LogContextCollector {
         val stackTrace = Thread.currentThread().stackTrace // 跳过日志框架的栈帧，定位到业务代码的调用点
         val targetIndex = findTargetStackTraceIndex(stackTrace)
         val targetElement = stackTrace.getOrNull(targetIndex) ?: return StackTraceInfo()
-        return StackTraceInfo(className = targetElement.className.substringAfterLast("."), // 简化类名（去掉包名）
-            methodName = targetElement.methodName, lineNumber = targetElement.lineNumber)
+        
+        // 解析类名：处理内部类（如 MainActivity$logRunnable$1 等）
+        var className = targetElement.className.substringAfterLast(".")
+        val innerClassIndex = className.indexOf('$')
+        if (innerClassIndex > 0) {
+            className = className.substring(0, innerClassIndex)
+        }
+        
+        return StackTraceInfo(
+            className = className, // 简化类名（去掉包名及内部类后缀）
+            methodName = targetElement.methodName, 
+            lineNumber = targetElement.lineNumber
+        )
     }
 
     /**
      * 找到业务代码的栈帧索引（跳过日志工具类的栈）
      */
     private fun findTargetStackTraceIndex(stackTrace: Array<StackTraceElement>): Int {
-        val packageName = getContext().packageName
+        val loggerPackage = "com.hearthappy.loggerx"
+        var foundLogClass = false
+        
         for (i in stackTrace.indices) {
             val element = stackTrace[i]
-            if (element.className.contains(packageName)) {
+            val className = element.className
+            
+            // 判断是否是 LoggerX 框架内部的类（包括代理类、输出类、核心采集类等）
+            val isLogClass = className.startsWith("$loggerPackage.core") || 
+                             className.startsWith("$loggerPackage.db") ||
+                             className.startsWith("$loggerPackage.LoggerX") ||
+                             className.startsWith("$loggerPackage.interceptor")
+            
+            if (isLogClass) {
+                foundLogClass = true
+            } else if (foundLogClass) {
+                // 当我们已经进入过日志库，然后遇到第一个不是日志库内部类的栈时
+                // 这就是外部调用者（即使它的包名也是 com.hearthappy.loggerx，例如 app module 的 MainActivity）
                 return i
             }
         }
+        
+        // 兜底逻辑：如果前面的逻辑失效，寻找第一个不属于框架内部核心逻辑的栈
+        for (i in stackTrace.indices) {
+            val className = stackTrace[i].className
+            if (!className.startsWith("$loggerPackage.core") && 
+                !className.startsWith("$loggerPackage.db") &&
+                !className.startsWith("$loggerPackage.LoggerX") &&
+                !className.startsWith("java.") && 
+                !className.startsWith("android.") && 
+                !className.startsWith("dalvik.")) {
+                return i
+            }
+        }
+        
         return -1
     }
 
