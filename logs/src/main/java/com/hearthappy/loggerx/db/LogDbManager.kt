@@ -11,6 +11,9 @@ import com.hearthappy.loggerx.core.FileLogStorageManager
 import com.hearthappy.loggerx.core.FileLogWriteException
 import com.hearthappy.loggerx.core.ImagePreviewData
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -46,6 +49,8 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_METHOD, method)
                 put(LoggerX.COLUMN_MESSAGE, message)
                 put(LoggerX.COLUMN_FILE_PATH, "")
+                put(LoggerX.COLUMN_FILE_MIME, "")
+                put(LoggerX.COLUMN_EVENT_ID, "")
             })
             notifyDataChanged()
         } catch (e: Exception) {
@@ -65,6 +70,8 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_METHOD, method)
                 put(LoggerX.COLUMN_MESSAGE, message)
                 put(LoggerX.COLUMN_FILE_PATH, managedFile.file.absolutePath)
+                put(LoggerX.COLUMN_FILE_MIME, managedFile.mimeType)
+                put(LoggerX.COLUMN_EVENT_ID, "")
             })
             notifyDataChanged()
             queryLogById(tableName, rowId.toInt()) ?: throw FileLogWriteException("写入文件日志失败，请稍后重试")
@@ -73,6 +80,36 @@ internal object LogDbManager {
             Log.e(LoggerX.TAG, "insertFileLog failed: ${e.message}")
             throw e as? FileLogWriteException ?: FileLogWriteException("写入文件日志失败，请稍后重试", e)
         }
+    }
+
+    @Synchronized
+    fun insertCatchLog(
+        eventId: String,
+        occurredAt: Long,
+        source: String,
+        method: String,
+        message: String,
+        reportFile: File,
+        mimeType: String
+    ): Boolean {
+        val tableName = getTableName(LoggerX.CATCH.getTag())
+        return runCatching {
+            ensureTable(tableName)
+            val rowId = database.insertWithOnConflict(tableName, null, ContentValues().apply {
+                put(LoggerX.COLUMN_TIME, SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(Date(occurredAt)))
+                put(LoggerX.COLUMN_LEVEL, "ERROR")
+                put(LoggerX.COLUMN_TAG, source)
+                put(LoggerX.COLUMN_METHOD, method)
+                put(LoggerX.COLUMN_MESSAGE, message)
+                put(LoggerX.COLUMN_FILE_PATH, reportFile.absolutePath)
+                put(LoggerX.COLUMN_FILE_MIME, mimeType)
+                put(LoggerX.COLUMN_EVENT_ID, eventId)
+            }, android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE)
+            if (rowId != -1L) notifyDataChanged()
+            rowId != -1L || eventExists(tableName, eventId)
+        }.onFailure {
+            Log.e(LoggerX.TAG, "insertCatchLog failed: ${it.message}", it)
+        }.getOrDefault(false)
     }
 
     fun loadImageBase64(scopeTag: String, logId: Int): String? {
@@ -87,6 +124,30 @@ internal object LogDbManager {
     fun loadImagePreviewData(scopeTag: String, logId: Int): ImagePreviewData? {
         val file = queryStoredFile(scopeTag, logId) ?: return null
         return ImagePreviewData(filePath = file.absolutePath, mimeType = FileLogStorageManager.detectMimeType(file))
+    }
+
+    fun loadAttachmentPreviewData(scopeTag: String, logId: Int): com.hearthappy.loggerx.core.AttachmentPreviewData? {
+        val tableName = getTableName(scopeTag)
+        if (!tableExists(tableName)) return null
+        return runCatching {
+            database.query(
+                tableName,
+                arrayOf(LoggerX.COLUMN_FILE_PATH, LoggerX.COLUMN_FILE_MIME),
+                "${LoggerX.COLUMN_ID}=?",
+                arrayOf(logId.toString()),
+                null,
+                null,
+                null,
+                "1"
+            ).use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val file = FileLogStorageManager.validateStoredFile(cursor.getString(0))
+                val mime = cursor.getString(1).orEmpty().ifBlank { FileLogStorageManager.detectMimeType(file) }
+                com.hearthappy.loggerx.core.AttachmentPreviewData(file.absolutePath, mime)
+            }
+        }.onFailure {
+            Log.e(LoggerX.TAG, "loadAttachmentPreviewData failed: ${it.message}")
+        }.getOrNull()
     }
 
     fun loadImageMimeType(scopeTag: String, logId: Int): String? {
@@ -131,9 +192,9 @@ internal object LogDbManager {
         }
         isImage?.let {
             whereParts += if (it) {
-                "IFNULL(s.${LoggerX.COLUMN_FILE_PATH}, '') <> ''"
+                "s.${LoggerX.COLUMN_FILE_MIME} LIKE 'image/%'"
             } else {
-                "IFNULL(s.${LoggerX.COLUMN_FILE_PATH}, '') = ''"
+                "s.${LoggerX.COLUMN_FILE_MIME} NOT LIKE 'image/%'"
             }
         }
         if (usingAnchor) {
@@ -163,7 +224,9 @@ internal object LogDbManager {
                 s.${LoggerX.COLUMN_TAG},
                 s.${LoggerX.COLUMN_METHOD},
                 s.${LoggerX.COLUMN_MESSAGE},
-                s.${LoggerX.COLUMN_FILE_PATH}
+                s.${LoggerX.COLUMN_FILE_PATH},
+                s.${LoggerX.COLUMN_FILE_MIME},
+                s.${LoggerX.COLUMN_EVENT_ID}
             FROM $tableName s
             $where
             ORDER BY s.${LoggerX.COLUMN_TIME} $order, s.${LoggerX.COLUMN_ID} $order
@@ -245,9 +308,9 @@ internal object LogDbManager {
         }
         isImage?.let {
             whereParts += if (it) {
-                "IFNULL(s.${LoggerX.COLUMN_FILE_PATH}, '') <> ''"
+                "s.${LoggerX.COLUMN_FILE_MIME} LIKE 'image/%'"
             } else {
-                "IFNULL(s.${LoggerX.COLUMN_FILE_PATH}, '') = ''"
+                "s.${LoggerX.COLUMN_FILE_MIME} NOT LIKE 'image/%'"
             }
         }
         val where = if (whereParts.isEmpty()) "" else "WHERE ${whereParts.joinToString(" AND ")}"
@@ -260,7 +323,9 @@ internal object LogDbManager {
                 s.${LoggerX.COLUMN_TAG},
                 s.${LoggerX.COLUMN_METHOD},
                 s.${LoggerX.COLUMN_MESSAGE},
-                s.${LoggerX.COLUMN_FILE_PATH}
+                s.${LoggerX.COLUMN_FILE_PATH},
+                s.${LoggerX.COLUMN_FILE_MIME},
+                s.${LoggerX.COLUMN_EVENT_ID}
             FROM $tableName s
             $where
             ORDER BY s.${LoggerX.COLUMN_TIME} $order, s.${LoggerX.COLUMN_ID} $order
@@ -292,7 +357,7 @@ internal object LogDbManager {
                 END FROM $tableName
             """.trimIndent()
             LoggerX.COLUMN_IS_IMAGE -> """
-                SELECT DISTINCT CASE WHEN IFNULL(${LoggerX.COLUMN_FILE_PATH}, '') <> '' THEN '1' ELSE '0' END FROM $tableName
+                SELECT DISTINCT CASE WHEN ${LoggerX.COLUMN_FILE_MIME} LIKE 'image/%' THEN '1' ELSE '0' END FROM $tableName
             """.trimIndent()
             else -> "SELECT DISTINCT $columnName FROM $tableName"
         }
@@ -492,10 +557,23 @@ internal object LogDbManager {
 
     private fun queryLogById(tableName: String, logId: Int): Map<String, Any>? {
         return runCatching {
-            database.query(tableName, arrayOf(LoggerX.COLUMN_ID, LoggerX.COLUMN_TIME, LoggerX.COLUMN_LEVEL, LoggerX.COLUMN_TAG, LoggerX.COLUMN_METHOD, LoggerX.COLUMN_MESSAGE, LoggerX.COLUMN_FILE_PATH), "${LoggerX.COLUMN_ID}=?", arrayOf(logId.toString()), null, null, null, "1").use { cursor ->
+            database.query(tableName, arrayOf(LoggerX.COLUMN_ID, LoggerX.COLUMN_TIME, LoggerX.COLUMN_LEVEL, LoggerX.COLUMN_TAG, LoggerX.COLUMN_METHOD, LoggerX.COLUMN_MESSAGE, LoggerX.COLUMN_FILE_PATH, LoggerX.COLUMN_FILE_MIME, LoggerX.COLUMN_EVENT_ID), "${LoggerX.COLUMN_ID}=?", arrayOf(logId.toString()), null, null, null, "1").use { cursor ->
                 if (cursor.moveToFirst()) cursorToMap(cursor) else null
             }
         }.getOrNull()
+    }
+
+    private fun eventExists(tableName: String, eventId: String): Boolean {
+        return database.query(
+            tableName,
+            arrayOf(LoggerX.COLUMN_ID),
+            "${LoggerX.COLUMN_EVENT_ID}=?",
+            arrayOf(eventId),
+            null,
+            null,
+            null,
+            "1"
+        ).use { it.moveToFirst() }
     }
 
     private fun queryFilePaths(tableName: String, where: String?, args: Array<String>?): List<String> {
@@ -528,7 +606,8 @@ internal object LogDbManager {
 
     private fun cursorToMap(c: Cursor): Map<String, Any> {
         val filePath = c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_FILE_PATH)).orEmpty()
-        return mutableMapOf<String, Any>(LoggerX.COLUMN_ID to c.getInt(c.getColumnIndexOrThrow(LoggerX.COLUMN_ID)), LoggerX.COLUMN_TIME to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TIME)).orEmpty(), LoggerX.COLUMN_LEVEL to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_LEVEL)).orEmpty(), LoggerX.COLUMN_TAG to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TAG)).orEmpty(), LoggerX.COLUMN_METHOD to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_METHOD)).orEmpty(), LoggerX.COLUMN_MESSAGE to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_MESSAGE)).orEmpty(), LoggerX.COLUMN_FILE_PATH to filePath, LoggerX.COLUMN_IS_IMAGE to if (filePath.isNotBlank()) 1 else 0)
+        val fileMime = c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_FILE_MIME)).orEmpty()
+        return mutableMapOf<String, Any>(LoggerX.COLUMN_ID to c.getInt(c.getColumnIndexOrThrow(LoggerX.COLUMN_ID)), LoggerX.COLUMN_TIME to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TIME)).orEmpty(), LoggerX.COLUMN_LEVEL to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_LEVEL)).orEmpty(), LoggerX.COLUMN_TAG to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TAG)).orEmpty(), LoggerX.COLUMN_METHOD to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_METHOD)).orEmpty(), LoggerX.COLUMN_MESSAGE to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_MESSAGE)).orEmpty(), LoggerX.COLUMN_FILE_PATH to filePath, LoggerX.COLUMN_FILE_MIME to fileMime, LoggerX.COLUMN_EVENT_ID to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_EVENT_ID)).orEmpty(), LoggerX.COLUMN_IS_IMAGE to if (fileMime.startsWith("image/")) 1 else 0)
     }
 
     private fun estimateRowBytes(row: Map<String, Any>): Int {

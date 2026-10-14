@@ -29,6 +29,7 @@ internal object LogOutputterManager {
         outputterMap[LoggerX.IMPORTANT.getTag()] = LogOutputter(scope = LoggerX.IMPORTANT, logInterceptorAdapter)
         outputterMap[LoggerX.KERNEL.getTag()] = LogOutputter(scope = LoggerX.KERNEL, logInterceptorAdapter)
         outputterMap[LoggerX.ERROR.getTag()] = LogOutputter(scope = LoggerX.ERROR, logInterceptorAdapter)
+        outputterMap[LoggerX.CATCH.getTag()] = LogOutputter(scope = LoggerX.CATCH, logInterceptorAdapter)
     }
 
 

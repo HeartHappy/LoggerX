@@ -20,5 +20,8 @@
         <activity
             android:name="com.hearthappy.loggerx.preview.PreviewLogActivity"
             android:exported="false" />
+        <activity
+            android:name="com.hearthappy.loggerx.preview.PreviewTextAttachmentActivity"
+            android:exported="false" />
     </application>
 </manifest>

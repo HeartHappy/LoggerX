@@ -101,18 +101,22 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
             tvMessage.text = data[LoggerX.COLUMN_MESSAGE].toString()
 
             val isImage = LogImageUiHelper.isImageLog(data)
+            val hasAttachment = LogImageUiHelper.hasAttachment(data)
             val filePath = LogImageUiHelper.resolveFilePath(data)
-            ivImageThumb.show(isImage, showBlock = {
+            ivImageThumb.show(hasAttachment, showBlock = {
                 val requestPath = filePath.ifBlank { null }
                 this.setImageDrawable(null)
                 tag = requestPath
-                if (requestPath != null) {
+                if (requestPath != null && isImage) {
                     LogImageLoaderFactory.get(context).loadThumbnail(this, path = requestPath)
+                } else {
+                    setImageResource(android.R.drawable.ic_menu_info_details)
                 }
 
                 setOnClickListener {
                     data[LoggerX.COLUMN_ID]?.toString()?.toIntOrNull()?.let { logId ->
-                        context.startActivity(Intent(context, PreviewLargeImageActivity::class.java).apply {
+                        val activityClass = if (isImage) PreviewLargeImageActivity::class.java else PreviewTextAttachmentActivity::class.java
+                        context.startActivity(Intent(context, activityClass).apply {
                             putExtra(PreviewLargeImageActivity.ARG_OUTPUTTER_INDEX, outPutterIndex)
                             putExtra(PreviewLargeImageActivity.ARG_LOG_ID, logId)
                         })
@@ -139,18 +143,22 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
             tvLevel.text = data[LoggerX.COLUMN_LEVEL].toString()
             level2Color(tvLevel, data[LoggerX.COLUMN_LEVEL].toString(),false)
             val isImage = LogImageUiHelper.isImageLog(data)
+            val hasAttachment = LogImageUiHelper.hasAttachment(data)
             val filePath = LogImageUiHelper.resolveFilePath(data)
-            ivImageThumb.show(isImage, showBlock = {
+            ivImageThumb.show(hasAttachment, showBlock = {
                 val requestPath = filePath.ifBlank { null }
                 this.setImageDrawable(null)
                 tag = requestPath
-                if (requestPath != null) {
+                if (requestPath != null && isImage) {
                     LogImageLoaderFactory.get(context).loadThumbnail(this, path = requestPath)
+                } else {
+                    setImageResource(android.R.drawable.ic_menu_info_details)
                 }
 
                 setOnClickListener {
                     data[LoggerX.COLUMN_ID]?.toString()?.toIntOrNull()?.let { logId ->
-                        context.startActivity(Intent(context, PreviewLargeImageActivity::class.java).apply {
+                        val activityClass = if (isImage) PreviewLargeImageActivity::class.java else PreviewTextAttachmentActivity::class.java
+                        context.startActivity(Intent(context, activityClass).apply {
                             putExtra(PreviewLargeImageActivity.ARG_OUTPUTTER_INDEX, outPutterIndex)
                             putExtra(PreviewLargeImageActivity.ARG_LOG_ID, logId)
                         })

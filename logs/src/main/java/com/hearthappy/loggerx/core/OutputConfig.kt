@@ -10,5 +10,15 @@ package com.hearthappy.loggerx.core
 data class OutputConfig(
     var isLog: Boolean = true,
     var isWriteDatabase: Boolean = true,
-    var storageDirPath: String? = null //图片文件存储目录
+    var storageDirPath: String? = null, //文件存储目录
+    var catchConfig: CatchConfig = CatchConfig()
+)
+
+data class CatchConfig(
+    val enabled: Boolean = false,
+    val captureJvmCrashes: Boolean = true,
+    val captureSystemExitInfo: Boolean = true,
+    val captureNativeCallContext: Boolean = true,
+    val maxReportBytes: Int = 1024 * 1024,
+    val maxPendingReports: Int = 32
 )

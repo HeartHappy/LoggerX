@@ -3,6 +3,7 @@ package com.hearthappy.loggerx
 import android.app.Application
 import android.content.Context
 import com.hearthappy.loggerx.core.ContextHolder
+import com.hearthappy.loggerx.core.CatchConfig
 import com.hearthappy.loggerx.core.LogExportManager
 import com.hearthappy.loggerx.core.LogOutputter
 import com.hearthappy.loggerx.core.LogOutputterManager
@@ -11,6 +12,8 @@ import com.hearthappy.loggerx.core.LogScopeProxy
 import com.hearthappy.loggerx.core.OutputConfig
 import com.hearthappy.loggerx.db.LogDbManager
 import com.hearthappy.loggerx.interceptor.LogInterceptor
+import com.hearthappy.loggerx.catcher.CrashCaptureManager
+import com.hearthappy.loggerx.catcher.CrashSource
 import java.io.File
 
 /**
@@ -42,12 +45,15 @@ class LoggerX {
         const val COLUMN_MESSAGE = "message"
         const val COLUMN_IS_IMAGE = "is_image" // virtual output column
         const val COLUMN_FILE_PATH = "file_path"
+        const val COLUMN_FILE_MIME = "file_mime"
+        const val COLUMN_EVENT_ID = "event_id"
 
         // ========== 内置Scope（直接调用） ==========
         val COMMON = LogScopeProxy("Common")
         val IMPORTANT = LogScopeProxy("Important")
         val KERNEL = LogScopeProxy("Kernel")
         val ERROR = LogScopeProxy("Error")
+        val CATCH = LogScopeProxy("CATCH")
         @Volatile
         internal var outputConfig: OutputConfig = OutputConfig()
 
@@ -66,9 +72,53 @@ class LoggerX {
          * 全局初始化（Application中调用）
          */
         fun init(context: Context, outputConfig: OutputConfig = OutputConfig()) {
-            ContextHolder.init(context as Application)
+            val application = (context.applicationContext as? Application)
+                ?: (context as? Application)
+                ?: throw IllegalArgumentException("LoggerX.init requires an Application context")
+            ContextHolder.init(application)
             this.outputConfig = outputConfig
             LogOutputterManager.initDefaultOutputters(outputConfig)
+            CrashCaptureManager.initialize(application, outputConfig.catchConfig)
+        }
+
+        fun enableCatch(config: CatchConfig = CatchConfig(enabled = true)) {
+            CrashCaptureManager.enable(config)
+        }
+
+        fun disableCatch() {
+            CrashCaptureManager.disable()
+        }
+
+        fun isCatchEnabled(): Boolean = CrashCaptureManager.isEnabled()
+
+        fun recoverCatchLogs(): Int = CrashCaptureManager.recover()
+
+        fun reportExternalCrash(
+            source: CrashSource,
+            crashType: Int? = null,
+            errorType: String? = null,
+            errorMessage: String? = null,
+            errorStack: String? = null,
+            extras: Map<String, String> = emptyMap()
+        ) {
+            CrashCaptureManager.reportExternalCrash(source, crashType, errorType, errorMessage, errorStack, extras)
+        }
+
+        fun recordException(throwable: Throwable, message: String = throwable.message.orEmpty()) {
+            CrashCaptureManager.recordCaughtException(throwable, message)
+        }
+
+        fun <T> traceNativeCall(
+            operation: String,
+            metadata: Map<String, String> = emptyMap(),
+            block: () -> T
+        ): T {
+            val token = CrashCaptureManager.beginNativeCall(operation, metadata)
+            return try {
+                block()
+            } finally {
+                CrashCaptureManager.endNativeCall(token)
+            }
         }
 
         fun getScopes(): List<String> {

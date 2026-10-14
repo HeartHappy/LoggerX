@@ -28,7 +28,7 @@
     <FrameLayout
         android:id="@+id/contentContainer"
         android:layout_width="match_parent"
-        android:layout_height="500dp">
+        android:layout_height="400dp">
 
         <!-- ViewPager2 展示不同分类的过滤项 -->
         <androidx.viewpager2.widget.ViewPager2

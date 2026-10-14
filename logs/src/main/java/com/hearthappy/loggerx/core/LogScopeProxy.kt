@@ -7,6 +7,7 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
 data class ImagePreviewData(val filePath: String, val mimeType: String)
+data class AttachmentPreviewData(val filePath: String, val mimeType: String)
 
 data class FileLogEntry(val id: Int, val time: String, val level: String, val tag: String, val method: String, val message: String, val filePath: String)
 
@@ -73,6 +74,10 @@ class LogScopeProxy(private val scope: String): LogScope {
 
     fun loadImagePreviewData(logId: Int): ImagePreviewData? {
         return LogDbManager.loadImagePreviewData(scope, logId)
+    }
+
+    fun loadAttachmentPreviewData(logId: Int): AttachmentPreviewData? {
+        return LogDbManager.loadAttachmentPreviewData(scope, logId)
     }
 
     fun doExportAndShare(exportAll: Boolean = false, limit: Int = 1000, format: LogExportManager.ExportFormat = LogExportManager.ExportFormat.CSV, onProgress: ((Int) -> Unit)? = null) {
