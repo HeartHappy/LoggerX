@@ -173,8 +173,43 @@ class LogDbManagerAndroidTest {
                 }
             }
             assertTrue(legacyTables.isEmpty())
-            assertEquals(7, db.version)
+            assertEquals(8, db.version)
         }
+    }
+
+    @Test
+    fun catchLog_shouldStoreTextAttachmentAndDeduplicateEvent() {
+        val report = File(baseDir, "offline-crash.txt").apply {
+            writeText("signal 11 (SIGSEGV)\njava stacktrace:\n  at Demo.nativeCall(Demo.kt:42)")
+        }
+        assertTrue(
+            LogDbManager.insertCatchLog(
+                eventId = "test-event-id",
+                occurredAt = System.currentTimeMillis(),
+                source = "NATIVE_CRASH",
+                method = "SIGSEGV",
+                message = "offline native crash",
+                reportFile = report,
+                mimeType = "text/plain"
+            )
+        )
+        assertTrue(
+            LogDbManager.insertCatchLog(
+                eventId = "test-event-id",
+                occurredAt = System.currentTimeMillis(),
+                source = "NATIVE_CRASH",
+                method = "SIGSEGV",
+                message = "duplicate",
+                reportFile = report,
+                mimeType = "text/plain"
+            )
+        )
+        val rows = LoggerX.CATCH.queryLogs(limit = 10)
+        assertEquals(1, rows.size)
+        assertEquals("text/plain", rows.first()[LoggerX.COLUMN_FILE_MIME])
+        assertEquals("0", rows.first()[LoggerX.COLUMN_IS_IMAGE].toString())
+        val id = rows.first()[LoggerX.COLUMN_ID].toString().toInt()
+        assertEquals(report.absolutePath, LoggerX.CATCH.loadAttachmentPreviewData(id)?.filePath)
     }
 
     @Test

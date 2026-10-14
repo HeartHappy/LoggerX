@@ -1,19 +1,20 @@
 package com.hearthappy.loggerx
 
 import android.content.Intent
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import com.hearthappy.basic.AbsBaseActivity
+import com.hearthappy.loggerx.databinding.ActivityMainBinding
 import com.hearthappy.loggerx.preview.PreviewLogActivity
+import com.tencent.bugly.crashreport.CrashReport
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 
-class MainActivity: AppCompatActivity() {
+class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
     private val handler = Handler(Looper.getMainLooper())
     private var logCount = 0
 
@@ -29,10 +30,10 @@ class MainActivity: AppCompatActivity() {
         }
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
+
+
+    override fun ActivityMainBinding.initData() {
         // 启动循环插入日志
         handler.post(logRunnable)
 
@@ -40,9 +41,14 @@ class MainActivity: AppCompatActivity() {
         LoggerX.COMMON.i("onCreate: $dbFileSize")
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(logRunnable)
+    override fun ActivityMainBinding.initListener() {
+    }
+
+    override fun ActivityMainBinding.initView() {
+
+    }
+
+    override fun ActivityMainBinding.initViewModelListener() {
     }
 
 
@@ -114,6 +120,42 @@ class MainActivity: AppCompatActivity() {
         }
     }
 
+    fun testJavaCrash(view: View) {
+        LoggerX.COMMON.i("即将触发主线程 Java 崩溃")
+        handler.postDelayed({
+            throw IllegalStateException("LoggerX demo main-thread Java crash")
+        }, 300)
+    }
+
+    fun testBackgroundCrash(view: View) {
+        LoggerX.COMMON.i("即将触发后台线程 Java 崩溃")
+        Thread({
+            throw IllegalArgumentException("LoggerX demo background-thread Java crash")
+        }, "loggerx-crash-worker").start()
+    }
+
+    fun testNativeCrash(view: View) {
+        LoggerX.COMMON.i("即将通过 Bugly 触发 Native 崩溃")
+        LoggerX.traceNativeCall(
+            operation = "Bugly.testNativeCrash",
+            metadata = mapOf("entry" to "MainActivity.testNativeCrash")
+        ) {
+            CrashReport.testNativeCrash()
+        }
+    }
+
+    fun testCaughtException(view: View) {
+        val throwable = IllegalStateException("LoggerX demo caught exception")
+        LoggerX.recordException(throwable, "Demo 主动记录的非致命异常")
+        CrashReport.postCatchedException(throwable)
+        Toast.makeText(this, "已写入 CATCH", Toast.LENGTH_SHORT).show()
+    }
+
+    fun recoverCrashLogs(view: View) {
+        val count = LoggerX.recoverCatchLogs()
+        Toast.makeText(this, "本次归档 $count 条 CATCH 日志", Toast.LENGTH_SHORT).show()
+    }
+
     private fun copyResourceToTempFile(resId: Int, fileName: String): File {
         val target = File(externalCacheDir, fileName)
         if (target.exists()) return target
@@ -125,5 +167,8 @@ class MainActivity: AppCompatActivity() {
         }
         return target
     }
-
+    override fun onDestroy() {
+        super.onDestroy()
+        handler.removeCallbacks(logRunnable)
+    }
 }

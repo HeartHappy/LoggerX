@@ -14,46 +14,52 @@ import com.hearthappy.loggerx.core.ContextHolder
  */
 internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME, null, DB_VERSION) {
 
+    init {
+        setWriteAheadLoggingEnabled(true)
+    }
+
     override fun onConfigure(db: SQLiteDatabase) {
         super.onConfigure(db)
-        db.enableWriteAheadLogging()
-        applyPragma(db, "PRAGMA synchronous=NORMAL")
-        applyPragma(db, "PRAGMA page_size=65536")
-        applyPragma(db, "PRAGMA cache_size=-64000")
     }
 
     override fun onCreate(db: SQLiteDatabase) {
-        applyOpenPragma(db)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        applyOpenPragma(db)
         migrateLegacySchema(db)
     }
 
     override fun onOpen(db: SQLiteDatabase) {
         super.onOpen(db)
-        applyOpenPragma(db)
     }
 
     /**
      * 根据表名创建日志表
      */
     fun createLogTable(db: SQLiteDatabase, tableName: String) {
-        val sql = """
-            CREATE TABLE IF NOT EXISTS $tableName (
-                ${LoggerX.COLUMN_ID } INTEGER PRIMARY KEY AUTOINCREMENT,
-                ${LoggerX.COLUMN_TIME} TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-                ${LoggerX.COLUMN_LEVEL} TEXT,
-                ${LoggerX.COLUMN_TAG} TEXT,
-                ${LoggerX.COLUMN_METHOD} TEXT,
-                ${LoggerX.COLUMN_MESSAGE} TEXT,
-                ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT ''
-            )
-        """.trimIndent()
-        db.execSQL(sql)
-        ensureScopeTableSchema(db, tableName)
-        ensureScopeIndexes(db, tableName)
+        val ownsTransaction = !db.inTransaction()
+        if (ownsTransaction) db.beginTransaction()
+        try {
+            val sql = """
+                CREATE TABLE IF NOT EXISTS $tableName (
+                    ${LoggerX.COLUMN_ID } INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ${LoggerX.COLUMN_TIME} TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                    ${LoggerX.COLUMN_LEVEL} TEXT,
+                    ${LoggerX.COLUMN_TAG} TEXT,
+                    ${LoggerX.COLUMN_METHOD} TEXT,
+                    ${LoggerX.COLUMN_MESSAGE} TEXT,
+                    ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT '',
+                    ${LoggerX.COLUMN_FILE_MIME} TEXT DEFAULT '',
+                    ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT ''
+                )
+            """.trimIndent()
+            db.execSQL(sql)
+            ensureScopeTableSchema(db, tableName)
+            ensureScopeIndexes(db, tableName)
+            if (ownsTransaction) db.setTransactionSuccessful()
+        } finally {
+            if (ownsTransaction) db.endTransaction()
+        }
     }
 
     private fun ensureScopeTableSchema(db: SQLiteDatabase, tableName: String) {
@@ -70,7 +76,9 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             LoggerX.COLUMN_TAG,
             LoggerX.COLUMN_METHOD,
             LoggerX.COLUMN_MESSAGE,
-            LoggerX.COLUMN_FILE_PATH
+            LoggerX.COLUMN_FILE_PATH,
+            LoggerX.COLUMN_FILE_MIME,
+            LoggerX.COLUMN_EVENT_ID
         )
         val hasLegacyImageColumns = columns.contains("image_payload") ||
             columns.contains("image_chunked") ||
@@ -101,7 +109,9 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
                 ${LoggerX.COLUMN_TAG} TEXT,
                 ${LoggerX.COLUMN_METHOD} TEXT,
                 ${LoggerX.COLUMN_MESSAGE} TEXT,
-                ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT ''
+                ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT '',
+                ${LoggerX.COLUMN_FILE_MIME} TEXT DEFAULT '',
+                ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT ''
             )
             """.trimIndent()
         )
@@ -112,7 +122,9 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             if (existingColumns.contains(LoggerX.COLUMN_TAG)) LoggerX.COLUMN_TAG else "'' AS ${LoggerX.COLUMN_TAG}",
             if (existingColumns.contains(LoggerX.COLUMN_METHOD)) LoggerX.COLUMN_METHOD else "'' AS ${LoggerX.COLUMN_METHOD}",
             if (existingColumns.contains(LoggerX.COLUMN_MESSAGE)) LoggerX.COLUMN_MESSAGE else "'' AS ${LoggerX.COLUMN_MESSAGE}",
-            if (existingColumns.contains(LoggerX.COLUMN_FILE_PATH)) LoggerX.COLUMN_FILE_PATH else "'' AS ${LoggerX.COLUMN_FILE_PATH}"
+            if (existingColumns.contains(LoggerX.COLUMN_FILE_PATH)) LoggerX.COLUMN_FILE_PATH else "'' AS ${LoggerX.COLUMN_FILE_PATH}",
+            if (existingColumns.contains(LoggerX.COLUMN_FILE_MIME)) LoggerX.COLUMN_FILE_MIME else if (existingColumns.contains(LoggerX.COLUMN_FILE_PATH)) "CASE WHEN IFNULL(${LoggerX.COLUMN_FILE_PATH}, '') <> '' THEN 'image/*' ELSE '' END AS ${LoggerX.COLUMN_FILE_MIME}" else "'' AS ${LoggerX.COLUMN_FILE_MIME}",
+            if (existingColumns.contains(LoggerX.COLUMN_EVENT_ID)) LoggerX.COLUMN_EVENT_ID else "'' AS ${LoggerX.COLUMN_EVENT_ID}"
         )
         val sql = "INSERT INTO $newTable (${columnsForInsert()}) SELECT ${selectParts.joinToString(",")} FROM $tableName"
         db.execSQL(sql)
@@ -126,6 +138,7 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${tableName}_file_path ON $tableName(${LoggerX.COLUMN_FILE_PATH})")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${tableName}_level_time_id ON $tableName(${LoggerX.COLUMN_LEVEL}, ${LoggerX.COLUMN_TIME} DESC, ${LoggerX.COLUMN_ID} DESC)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_${tableName}_tag_time_id ON $tableName(${LoggerX.COLUMN_TAG}, ${LoggerX.COLUMN_TIME} DESC, ${LoggerX.COLUMN_ID} DESC)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS idx_${tableName}_event_id ON $tableName(${LoggerX.COLUMN_EVENT_ID}) WHERE ${LoggerX.COLUMN_EVENT_ID} <> ''")
     }
 
     private fun columnsForInsert(): String {
@@ -136,7 +149,9 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             LoggerX.COLUMN_TAG,
             LoggerX.COLUMN_METHOD,
             LoggerX.COLUMN_MESSAGE,
-            LoggerX.COLUMN_FILE_PATH
+            LoggerX.COLUMN_FILE_PATH,
+            LoggerX.COLUMN_FILE_MIME,
+            LoggerX.COLUMN_EVENT_ID
         ).joinToString(",")
     }
 
@@ -179,19 +194,6 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
         return tables
     }
 
-    private fun applyOpenPragma(db: SQLiteDatabase) {
-        applyPragma(db, "PRAGMA journal_mode=WAL")
-        applyPragma(db, "PRAGMA synchronous=NORMAL")
-        applyPragma(db, "PRAGMA cache_size=-64000")
-    }
-
-    private fun applyPragma(db: SQLiteDatabase, sql: String) {
-        runCatching {
-            db.rawQuery(sql, null).use { }
-        }.recoverCatching {
-            db.execSQL(sql)
-        }
-    }
     /**
      * 获取日志数据库文件的大小（单位：MB）
      */
@@ -203,6 +205,6 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
     }
     companion object {
         const val DB_NAME = "hearthappy_logs.db"
-        const val DB_VERSION = 7
+        const val DB_VERSION = 8
     }
 }

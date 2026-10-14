@@ -161,7 +161,10 @@ internal object FileLogStorageManager {
             "gif" -> "image/gif"
             "webp" -> "image/webp"
             "bmp" -> "image/bmp"
-            else -> "image/*"
+            "txt", "log", "tombstone" -> "text/plain"
+            "json" -> "application/json"
+            "xml" -> "application/xml"
+            else -> "application/octet-stream"
         }
     }
 
