@@ -106,10 +106,6 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
     }
 
     fun queryDBLogs(view: View) {
-        val distinctValues = LoggerX.IMPORTANT.getDistinctValues(LoggerX.COLUMN_METHOD)
-        LoggerX.COMMON.d("queryDBLogs: ${distinctValues.toList()}")
-        val queryLogs = LoggerX.IMPORTANT.queryLogs(isAsc = false)
-        LoggerX.COMMON.d("queryDBLogs: ${queryLogs.toList().joinToString { "$it" }}")
         startActivity(Intent(this, PreviewLogActivity::class.java))
     }
 
@@ -137,10 +133,7 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
 
     fun testNativeCrash(view: View) {
         LoggerX.COMMON.i("即将通过 Bugly 触发 Native 崩溃")
-        LoggerX.traceNativeCall(
-            operation = "Bugly.testNativeCrash",
-            metadata = mapOf("entry" to "MainActivity.testNativeCrash")
-        ) {
+        LoggerX.traceNativeCall {
             CrashReport.testNativeCrash()
         }
     }

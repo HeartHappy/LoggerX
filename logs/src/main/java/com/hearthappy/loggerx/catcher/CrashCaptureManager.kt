@@ -105,14 +105,15 @@ internal object CrashCaptureManager {
         recover()
     }
 
-    fun beginNativeCall(operation: String, metadata: Map<String, String>): NativeCallToken? {
+    fun beginNativeCall(): NativeCallToken? {
         if (!isEnabled() || !config.captureNativeCallContext) return null
         val thread = Thread.currentThread()
-        val stack = thread.stackTrace
-            .dropWhile { it.className.startsWith("com.hearthappy.loggerx") || it.className == Thread::class.java.name }
-            .joinToString("\n") { "    at $it" }
+        val frames = thread.stackTrace.dropWhile {
+            it.className.startsWith("com.hearthappy.loggerx") || it.className == Thread::class.java.name
+        }
+        val caller = frames.firstOrNull()
+        val stack = frames.joinToString("\n") { "    at $it" }
         val details = buildString {
-            for ((key, value) in metadata) appendLine("$key=$value")
             appendLine("state=in_native_call")
             append(CrashEnvironment.deviceAndAppDetails())
         }
@@ -124,7 +125,7 @@ internal object CrashCaptureManager {
                 sessionId = CrashEnvironment.sessionId,
                 processName = CrashEnvironment.processName(),
                 threadName = thread.name,
-                errorType = operation,
+                errorType = caller?.let { "${it.className.substringAfterLast('.')}.${it.methodName}" }.orEmpty(),
                 errorMessage = "Native call did not return before the process exited",
                 stackTrace = stack,
                 details = details

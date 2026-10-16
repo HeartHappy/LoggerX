@@ -157,10 +157,7 @@ LoggerX.enableCatch(CatchConfig(enabled = true))
 Native 调用建议通过 `traceNativeCall` 包裹，以便在 SO 崩溃后保留 Java/Kotlin 入口调用链：
 
 ```kotlin
-LoggerX.traceNativeCall(
-    operation = "VideoDecoder.decode",
-    metadata = mapOf("requestId" to requestId)
-) {
+LoggerX.traceNativeCall {
     nativeDecode(frame)
 }
 ```

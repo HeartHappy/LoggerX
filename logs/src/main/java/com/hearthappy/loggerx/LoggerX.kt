@@ -39,17 +39,17 @@ class LoggerX {
         internal const val TAG = "LoggerX"
 
         //字段常量
-        const val COLUMN_ID = "id"
-        const val COLUMN_TIME = "time"
-        const val COLUMN_LEVEL = "level"
-        const val COLUMN_TAG = "tag"
-        const val COLUMN_METHOD = "method"
-        const val COLUMN_MESSAGE = "message"
-        const val COLUMN_IS_IMAGE = "is_image" // virtual output column
-        const val COLUMN_FILE_PATH = "file_path"
-        const val COLUMN_FILE_MIME = "file_mime"
-        const val COLUMN_EVENT_ID = "event_id"
-        const val COLUMN_UPLOADED = "uploaded"
+        internal const val COLUMN_ID = "id"
+        internal const val COLUMN_TIME = "time"
+        internal const val COLUMN_LEVEL = "level"
+        internal const val COLUMN_TAG = "tag"
+        internal const val COLUMN_METHOD = "method"
+        internal const val COLUMN_MESSAGE = "message"
+        internal const val COLUMN_IS_IMAGE = "is_image" // virtual output column
+        internal const val COLUMN_FILE_PATH = "file_path"
+        internal const val COLUMN_FILE_MIME = "file_mime"
+        internal const val COLUMN_EVENT_ID = "event_id"
+        internal const val COLUMN_UPLOADED = "uploaded"
 
         // ========== 内置Scope（直接调用） ==========
         val COMMON = LogScopeProxy("Common")
@@ -57,8 +57,8 @@ class LoggerX {
         val KERNEL = LogScopeProxy("Kernel")
         val ERROR = LogScopeProxy("Error")
         val CATCH = LogScopeProxy("Catch")
-        @Volatile
-        internal var outputConfig: OutputConfig = OutputConfig()
+
+        @Volatile internal var outputConfig: OutputConfig = OutputConfig()
 
         // ========== 自定义Scope（扩展用） ==========
         fun registerScope(logInterceptor: LogInterceptor, vararg scopes: LogScope) {
@@ -75,9 +75,7 @@ class LoggerX {
          * 全局初始化（Application中调用）
          */
         fun init(context: Context, outputConfig: OutputConfig = OutputConfig()) {
-            val application = (context.applicationContext as? Application)
-                ?: (context as? Application)
-                ?: throw IllegalArgumentException("LoggerX.init requires an Application context")
+            val application = (context.applicationContext as? Application) ?: (context as? Application) ?: throw IllegalArgumentException("LoggerX.init requires an Application context")
             ContextHolder.init(application)
             this.outputConfig = outputConfig
             LogOutputterManager.initDefaultOutputters(outputConfig)
@@ -108,14 +106,7 @@ class LoggerX {
             CrashUploadDispatcher.request(logId)
         }
 
-        fun reportExternalCrash(
-            source: CrashSource,
-            crashType: Int? = null,
-            errorType: String? = null,
-            errorMessage: String? = null,
-            errorStack: String? = null,
-            extras: Map<String, String> = emptyMap()
-        ) {
+        fun reportExternalCrash(source: CrashSource, crashType: Int? = null, errorType: String? = null, errorMessage: String? = null, errorStack: String? = null, extras: Map<String, String> = emptyMap()) {
             CrashCaptureManager.reportExternalCrash(source, crashType, errorType, errorMessage, errorStack, extras)
         }
 
@@ -123,12 +114,8 @@ class LoggerX {
             CrashCaptureManager.recordCaughtException(throwable, message)
         }
 
-        fun <T> traceNativeCall(
-            operation: String,
-            metadata: Map<String, String> = emptyMap(),
-            block: () -> T
-        ): T {
-            val token = CrashCaptureManager.beginNativeCall(operation, metadata)
+        fun <T> traceNativeCall(block: () -> T): T {
+            val token = CrashCaptureManager.beginNativeCall()
             return try {
                 block()
             } finally {
@@ -159,12 +146,7 @@ class LoggerX {
          * @param format 导出格式（CSV/TXT）
          * @param onProgress 总体导出进度回调 (0..100)
          */
-        fun exportAndShareAll(
-            exportAll: Boolean = true,
-            limit: Int = 1000,
-            format: LogExportManager.ExportFormat = LogExportManager.ExportFormat.CSV,
-            onProgress: ((Int) -> Unit)? = null
-        ) {
+        fun exportAndShareAll(exportAll: Boolean = true, limit: Int = 1000, format: LogExportManager.ExportFormat = LogExportManager.ExportFormat.CSV, onProgress: ((Int) -> Unit)? = null) {
             LogExportManager.exportAll(exportAll, limit, format, onProgress)
         }
 
@@ -176,13 +158,7 @@ class LoggerX {
          * @param onProgress 总体导出进度回调 (0..100)
          * @param onFilesReady 文件列表就绪回调，接收导出的所有文件列表
          */
-        fun exportAllFiles(
-            exportAll: Boolean = true,
-            limit: Int = 1000,
-            format: LogExportManager.ExportFormat = LogExportManager.ExportFormat.CSV,
-            onProgress: ((Int) -> Unit)? = null,
-            onFilesReady: ((List<File>) -> Unit)? = null
-        ) {
+        fun exportAllFiles(exportAll: Boolean = true, limit: Int = 1000, format: LogExportManager.ExportFormat = LogExportManager.ExportFormat.CSV, onProgress: ((Int) -> Unit)? = null, onFilesReady: ((List<File>) -> Unit)? = null) {
             LogExportManager.exportAllFiles(exportAll, limit, format, onProgress, onFilesReady)
         }
 
