@@ -148,7 +148,9 @@ object DataQueryService {
                 return
             }
             emitProgress(session, 85, "building-result")
-            cache.put(cacheKey, pageResult)
+            if (pageResult.totalCount > 0 || pageResult.rows.isNotEmpty()) {
+                cache.put(cacheKey, pageResult)
+            }
             emitProgress(session, 100, "done")
             val result = QueryResult(session.queryId, pageResult, false)
             session.lastResult = result

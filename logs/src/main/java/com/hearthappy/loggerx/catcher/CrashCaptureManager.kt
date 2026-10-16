@@ -7,6 +7,7 @@ import android.util.Log
 import com.hearthappy.loggerx.LoggerX
 import com.hearthappy.loggerx.core.CatchConfig
 import com.hearthappy.loggerx.core.Utils
+import com.hearthappy.loggerx.db.LogDbManager
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.core.content.edit
@@ -24,6 +25,7 @@ internal object CrashCaptureManager {
         CrashEnvironment.initialize(application)
         this.config = config
         CrashEmergencyStore.initialize(application, config)
+        LogDbManager.prepareCatchTable()
         recover()
         if (config.enabled) enable(config)
     }

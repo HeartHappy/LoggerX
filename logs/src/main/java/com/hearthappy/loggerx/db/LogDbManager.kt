@@ -30,6 +30,10 @@ internal object LogDbManager {
         return "${cleanTag}_log"
     }
 
+    internal fun prepareCatchTable() {
+        ensureTable(getTableName(LoggerX.CATCH.getTag()))
+    }
+
     @Synchronized private fun ensureTable(tableName: String) {
         if (existedTables.contains(tableName)) return
         dbHelper.createLogTable(database, tableName)
@@ -163,6 +167,7 @@ internal object LogDbManager {
         return queryLogsPageAdvanced(scopeTag = scopeTag, time = time, tag = tag, level = level, method = method, isImage = isImage, keyword = keyword, isAsc = isAsc, page = page, limit = limit).rows
     }
 
+    @Synchronized
     fun queryLogsPageAdvanced(scopeTag: String, time: String? = null, tag: String? = null, level: String? = null, method: String? = null, isImage: Boolean? = null, keyword: String? = null, isAsc: Boolean = false, page: Int = 1, limit: Int = 100, maxPageBytes: Int = 1024 * 1024, anchorTime: String? = null, anchorId: Int? = null): QueryPageResult {
         val tableName = getTableName(scopeTag)
         if (!tableExists(tableName)) {
@@ -277,9 +282,9 @@ internal object LogDbManager {
                 nextAnchorTime = lastRow?.get(LoggerX.COLUMN_TIME)?.toString(),
                 nextAnchorId = lastRow?.get(LoggerX.COLUMN_ID)?.toString()?.toIntOrNull()
             )
-        }.getOrElse {
-            Log.e(LoggerX.TAG, "queryLogsPageAdvanced failed: ${it.message}")
-            QueryPageResult(emptyList(), 0, page, limit, null, 0, false, emptyList())
+        }.getOrElse { throwable ->
+            Log.e(LoggerX.TAG, "queryLogsPageAdvanced failed: ${throwable.message}", throwable)
+            throw throwable
         }
     }
 
@@ -673,6 +678,7 @@ internal object LogDbManager {
         }.coerceAtLeast(64)
     }
 
+    @Synchronized
     private fun tableExists(tableName: String): Boolean {
         if (existedTables.contains(tableName)) return true
         val exists = runCatching {
