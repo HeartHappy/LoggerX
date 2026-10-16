@@ -104,6 +104,7 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_FILE_PATH, reportFile.absolutePath)
                 put(LoggerX.COLUMN_FILE_MIME, mimeType)
                 put(LoggerX.COLUMN_EVENT_ID, eventId)
+                put(LoggerX.COLUMN_UPLOADED, 0)
             }, android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE)
             if (rowId != -1L) notifyDataChanged()
             rowId != -1L || eventExists(tableName, eventId)
@@ -226,7 +227,8 @@ internal object LogDbManager {
                 s.${LoggerX.COLUMN_MESSAGE},
                 s.${LoggerX.COLUMN_FILE_PATH},
                 s.${LoggerX.COLUMN_FILE_MIME},
-                s.${LoggerX.COLUMN_EVENT_ID}
+                s.${LoggerX.COLUMN_EVENT_ID},
+                s.${LoggerX.COLUMN_UPLOADED}
             FROM $tableName s
             $where
             ORDER BY s.${LoggerX.COLUMN_TIME} $order, s.${LoggerX.COLUMN_ID} $order
@@ -325,7 +327,8 @@ internal object LogDbManager {
                 s.${LoggerX.COLUMN_MESSAGE},
                 s.${LoggerX.COLUMN_FILE_PATH},
                 s.${LoggerX.COLUMN_FILE_MIME},
-                s.${LoggerX.COLUMN_EVENT_ID}
+                s.${LoggerX.COLUMN_EVENT_ID},
+                s.${LoggerX.COLUMN_UPLOADED}
             FROM $tableName s
             $where
             ORDER BY s.${LoggerX.COLUMN_TIME} $order, s.${LoggerX.COLUMN_ID} $order
@@ -555,9 +558,61 @@ internal object LogDbManager {
         }.getOrNull()
     }
 
+    internal fun queryUnuploadedCatchLogs(): List<Map<String, Any>> {
+        val tableName = getTableName(LoggerX.CATCH.getTag())
+        if (!tableExists(tableName)) return emptyList()
+        val sql = """
+            SELECT
+                ${LoggerX.COLUMN_ID},
+                ${LoggerX.COLUMN_TIME},
+                ${LoggerX.COLUMN_LEVEL},
+                ${LoggerX.COLUMN_TAG},
+                ${LoggerX.COLUMN_METHOD},
+                ${LoggerX.COLUMN_MESSAGE},
+                ${LoggerX.COLUMN_FILE_PATH},
+                ${LoggerX.COLUMN_FILE_MIME},
+                ${LoggerX.COLUMN_EVENT_ID},
+                ${LoggerX.COLUMN_UPLOADED}
+            FROM $tableName
+            WHERE ${LoggerX.COLUMN_UPLOADED} = 0
+                AND ${LoggerX.COLUMN_EVENT_ID} <> ''
+                AND ${LoggerX.COLUMN_FILE_PATH} <> ''
+            ORDER BY ${LoggerX.COLUMN_TIME} ASC, ${LoggerX.COLUMN_ID} ASC
+        """.trimIndent()
+        return runCatching {
+            val result = mutableListOf<Map<String, Any>>()
+            database.rawQuery(sql, null).use { cursor ->
+                while (cursor.moveToNext()) result += cursorToMap(cursor)
+            }
+            result
+        }.getOrElse {
+            Log.e(LoggerX.TAG, "queryUnuploadedCatchLogs failed: ${it.message}")
+            emptyList()
+        }
+    }
+
+    internal fun queryCatchLog(logId: Int): Map<String, Any>? {
+        val tableName = getTableName(LoggerX.CATCH.getTag())
+        if (!tableExists(tableName)) return null
+        return queryLogById(tableName, logId)
+    }
+
+    internal fun markCatchUploaded(logId: Int): Boolean {
+        val tableName = getTableName(LoggerX.CATCH.getTag())
+        if (!tableExists(tableName)) return false
+        val updated = database.update(
+            tableName,
+            ContentValues().apply { put(LoggerX.COLUMN_UPLOADED, 1) },
+            "${LoggerX.COLUMN_ID}=? AND ${LoggerX.COLUMN_UPLOADED}=0",
+            arrayOf(logId.toString())
+        )
+        if (updated > 0) notifyDataChanged()
+        return updated > 0
+    }
+
     private fun queryLogById(tableName: String, logId: Int): Map<String, Any>? {
         return runCatching {
-            database.query(tableName, arrayOf(LoggerX.COLUMN_ID, LoggerX.COLUMN_TIME, LoggerX.COLUMN_LEVEL, LoggerX.COLUMN_TAG, LoggerX.COLUMN_METHOD, LoggerX.COLUMN_MESSAGE, LoggerX.COLUMN_FILE_PATH, LoggerX.COLUMN_FILE_MIME, LoggerX.COLUMN_EVENT_ID), "${LoggerX.COLUMN_ID}=?", arrayOf(logId.toString()), null, null, null, "1").use { cursor ->
+            database.query(tableName, arrayOf(LoggerX.COLUMN_ID, LoggerX.COLUMN_TIME, LoggerX.COLUMN_LEVEL, LoggerX.COLUMN_TAG, LoggerX.COLUMN_METHOD, LoggerX.COLUMN_MESSAGE, LoggerX.COLUMN_FILE_PATH, LoggerX.COLUMN_FILE_MIME, LoggerX.COLUMN_EVENT_ID, LoggerX.COLUMN_UPLOADED), "${LoggerX.COLUMN_ID}=?", arrayOf(logId.toString()), null, null, null, "1").use { cursor ->
                 if (cursor.moveToFirst()) cursorToMap(cursor) else null
             }
         }.getOrNull()
@@ -607,7 +662,9 @@ internal object LogDbManager {
     private fun cursorToMap(c: Cursor): Map<String, Any> {
         val filePath = c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_FILE_PATH)).orEmpty()
         val fileMime = c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_FILE_MIME)).orEmpty()
-        return mutableMapOf<String, Any>(LoggerX.COLUMN_ID to c.getInt(c.getColumnIndexOrThrow(LoggerX.COLUMN_ID)), LoggerX.COLUMN_TIME to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TIME)).orEmpty(), LoggerX.COLUMN_LEVEL to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_LEVEL)).orEmpty(), LoggerX.COLUMN_TAG to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TAG)).orEmpty(), LoggerX.COLUMN_METHOD to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_METHOD)).orEmpty(), LoggerX.COLUMN_MESSAGE to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_MESSAGE)).orEmpty(), LoggerX.COLUMN_FILE_PATH to filePath, LoggerX.COLUMN_FILE_MIME to fileMime, LoggerX.COLUMN_EVENT_ID to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_EVENT_ID)).orEmpty(), LoggerX.COLUMN_IS_IMAGE to if (fileMime.startsWith("image/")) 1 else 0)
+        val uploadedIndex = c.getColumnIndex(LoggerX.COLUMN_UPLOADED)
+        val uploaded = if (uploadedIndex >= 0) c.getInt(uploadedIndex) else 0
+        return mutableMapOf<String, Any>(LoggerX.COLUMN_ID to c.getInt(c.getColumnIndexOrThrow(LoggerX.COLUMN_ID)), LoggerX.COLUMN_TIME to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TIME)).orEmpty(), LoggerX.COLUMN_LEVEL to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_LEVEL)).orEmpty(), LoggerX.COLUMN_TAG to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_TAG)).orEmpty(), LoggerX.COLUMN_METHOD to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_METHOD)).orEmpty(), LoggerX.COLUMN_MESSAGE to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_MESSAGE)).orEmpty(), LoggerX.COLUMN_FILE_PATH to filePath, LoggerX.COLUMN_FILE_MIME to fileMime, LoggerX.COLUMN_EVENT_ID to c.getString(c.getColumnIndexOrThrow(LoggerX.COLUMN_EVENT_ID)).orEmpty(), LoggerX.COLUMN_UPLOADED to uploaded, LoggerX.COLUMN_IS_IMAGE to if (fileMime.startsWith("image/")) 1 else 0)
     }
 
     private fun estimateRowBytes(row: Map<String, Any>): Int {

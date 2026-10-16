@@ -173,7 +173,7 @@ class LogDbManagerAndroidTest {
                 }
             }
             assertTrue(legacyTables.isEmpty())
-            assertEquals(8, db.version)
+            assertEquals(9, db.version)
         }
     }
 

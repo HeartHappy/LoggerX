@@ -50,7 +50,8 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
                     ${LoggerX.COLUMN_MESSAGE} TEXT,
                     ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT '',
                     ${LoggerX.COLUMN_FILE_MIME} TEXT DEFAULT '',
-                    ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT ''
+                    ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT '',
+                    ${LoggerX.COLUMN_UPLOADED} INTEGER NOT NULL DEFAULT 0
                 )
             """.trimIndent()
             db.execSQL(sql)
@@ -78,7 +79,8 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             LoggerX.COLUMN_MESSAGE,
             LoggerX.COLUMN_FILE_PATH,
             LoggerX.COLUMN_FILE_MIME,
-            LoggerX.COLUMN_EVENT_ID
+            LoggerX.COLUMN_EVENT_ID,
+            LoggerX.COLUMN_UPLOADED
         )
         val hasLegacyImageColumns = columns.contains("image_payload") ||
             columns.contains("image_chunked") ||
@@ -111,7 +113,8 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
                 ${LoggerX.COLUMN_MESSAGE} TEXT,
                 ${LoggerX.COLUMN_FILE_PATH} VARCHAR(512) DEFAULT '',
                 ${LoggerX.COLUMN_FILE_MIME} TEXT DEFAULT '',
-                ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT ''
+                ${LoggerX.COLUMN_EVENT_ID} TEXT DEFAULT '',
+                ${LoggerX.COLUMN_UPLOADED} INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )
@@ -124,7 +127,8 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             if (existingColumns.contains(LoggerX.COLUMN_MESSAGE)) LoggerX.COLUMN_MESSAGE else "'' AS ${LoggerX.COLUMN_MESSAGE}",
             if (existingColumns.contains(LoggerX.COLUMN_FILE_PATH)) LoggerX.COLUMN_FILE_PATH else "'' AS ${LoggerX.COLUMN_FILE_PATH}",
             if (existingColumns.contains(LoggerX.COLUMN_FILE_MIME)) LoggerX.COLUMN_FILE_MIME else if (existingColumns.contains(LoggerX.COLUMN_FILE_PATH)) "CASE WHEN IFNULL(${LoggerX.COLUMN_FILE_PATH}, '') <> '' THEN 'image/*' ELSE '' END AS ${LoggerX.COLUMN_FILE_MIME}" else "'' AS ${LoggerX.COLUMN_FILE_MIME}",
-            if (existingColumns.contains(LoggerX.COLUMN_EVENT_ID)) LoggerX.COLUMN_EVENT_ID else "'' AS ${LoggerX.COLUMN_EVENT_ID}"
+            if (existingColumns.contains(LoggerX.COLUMN_EVENT_ID)) LoggerX.COLUMN_EVENT_ID else "'' AS ${LoggerX.COLUMN_EVENT_ID}",
+            if (existingColumns.contains(LoggerX.COLUMN_UPLOADED)) LoggerX.COLUMN_UPLOADED else "0 AS ${LoggerX.COLUMN_UPLOADED}"
         )
         val sql = "INSERT INTO $newTable (${columnsForInsert()}) SELECT ${selectParts.joinToString(",")} FROM $tableName"
         db.execSQL(sql)
@@ -151,7 +155,8 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
             LoggerX.COLUMN_MESSAGE,
             LoggerX.COLUMN_FILE_PATH,
             LoggerX.COLUMN_FILE_MIME,
-            LoggerX.COLUMN_EVENT_ID
+            LoggerX.COLUMN_EVENT_ID,
+            LoggerX.COLUMN_UPLOADED
         ).joinToString(",")
     }
 
@@ -205,6 +210,6 @@ internal class LogDbHelper(context: Context) : SQLiteOpenHelper(context, DB_NAME
     }
     companion object {
         const val DB_NAME = "hearthappy_logs.db"
-        const val DB_VERSION = 8
+        const val DB_VERSION = 9
     }
 }

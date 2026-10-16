@@ -99,11 +99,23 @@
         android:textColor="@color/translucent_white_20"
         android:textSize="8sp"
         app:layout_constraintBottom_toBottomOf="@id/llId"
-        app:layout_constraintEnd_toStartOf="@+id/ivImageThumb"
+        app:layout_constraintEnd_toStartOf="@+id/ivCatchUpload"
         app:layout_constraintStart_toEndOf="@+id/llId"
         app:layout_constraintTop_toBottomOf="@+id/llLevel"
         app:layout_constraintVertical_chainStyle="packed"
         tools:text="External socket established via encrypted handshake. Packet integrity verified by node-7." />
+
+    <ImageView
+        android:id="@+id/ivCatchUpload"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginEnd="4dp"
+        android:contentDescription="@string/catch_upload"
+        android:src="@drawable/ic_log_upload"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/tvMessage"
+        app:layout_constraintEnd_toStartOf="@id/ivImageThumb"
+        app:layout_constraintTop_toTopOf="@id/tvMessage" />
 
     <!-- Image Thumbnail Icon on the right -->
     <ImageView

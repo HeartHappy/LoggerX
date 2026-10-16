@@ -14,6 +14,8 @@ import com.hearthappy.loggerx.db.LogDbManager
 import com.hearthappy.loggerx.interceptor.LogInterceptor
 import com.hearthappy.loggerx.catcher.CrashCaptureManager
 import com.hearthappy.loggerx.catcher.CrashSource
+import com.hearthappy.loggerx.catcher.CrashUploadCallback
+import com.hearthappy.loggerx.catcher.CrashUploadDispatcher
 import java.io.File
 
 /**
@@ -47,13 +49,14 @@ class LoggerX {
         const val COLUMN_FILE_PATH = "file_path"
         const val COLUMN_FILE_MIME = "file_mime"
         const val COLUMN_EVENT_ID = "event_id"
+        const val COLUMN_UPLOADED = "uploaded"
 
         // ========== 内置Scope（直接调用） ==========
         val COMMON = LogScopeProxy("Common")
         val IMPORTANT = LogScopeProxy("Important")
         val KERNEL = LogScopeProxy("Kernel")
         val ERROR = LogScopeProxy("Error")
-        val CATCH = LogScopeProxy("CATCH")
+        val CATCH = LogScopeProxy("Catch")
         @Volatile
         internal var outputConfig: OutputConfig = OutputConfig()
 
@@ -92,6 +95,18 @@ class LoggerX {
         fun isCatchEnabled(): Boolean = CrashCaptureManager.isEnabled()
 
         fun recoverCatchLogs(): Int = CrashCaptureManager.recover()
+
+        /**
+         * 注册 CATCH 报告上传回调。注册后会立即回调全部未上传记录，不限条数。
+         * 回调返回 true 时，该条会被记为已上传。
+         */
+        fun setCrashUploadCallback(callback: CrashUploadCallback?) {
+            CrashUploadDispatcher.setCallback(callback)
+        }
+
+        fun requestCatchUpload(logId: Int) {
+            CrashUploadDispatcher.request(logId)
+        }
 
         fun reportExternalCrash(
             source: CrashSource,

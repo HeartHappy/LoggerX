@@ -65,6 +65,15 @@ class PreviewViewModel(private val scopeProxy: LogScopeProxy) : ViewModel() {
         queryWithState(_appliedState.value)
     }
 
+    fun markCatchUploaded(logId: Int) {
+        _logUiState.update { state ->
+            state.copy(logs = state.logs.map { row ->
+                val id = row[LoggerX.COLUMN_ID]?.toString()?.toIntOrNull()
+                if (id == logId) HashMap(row).apply { put(LoggerX.COLUMN_UPLOADED, 1) } else row
+            })
+        }
+    }
+
     fun loadMoreLogs() {
         if (_logUiState.value.loading || !_logUiState.value.hasMore) return
         val anchorTime = nextAnchorTime ?: return

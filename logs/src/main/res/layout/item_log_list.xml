@@ -111,6 +111,19 @@
         app:layout_constraintBottom_toBottomOf="parent"
         tools:text="External socket established via encrypted handshake. Packet integrity verified by node-7." />
 
+    <ImageView
+        android:id="@+id/ivCatchUpload"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="4dp"
+        android:contentDescription="@string/catch_upload"
+        android:src="@drawable/ic_log_upload"
+        style="@style/style_card_selectable"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/ivImageThumb"
+        app:layout_constraintEnd_toStartOf="@+id/ivImageThumb"
+        app:layout_constraintTop_toTopOf="@id/ivImageThumb" />
+
     <!-- Image Thumbnail Icon on the right -->
     <ImageView
         android:id="@+id/ivImageThumb"
@@ -118,6 +131,7 @@
         android:layout_height="30dp"
         android:contentDescription="@string/preview_image"
         android:visibility="visible"
+        style="@style/style_card_selectable"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@+id/tvTag"
         app:layout_constraintBottom_toBottomOf="@+id/tvMethod"

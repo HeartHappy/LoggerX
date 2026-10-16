@@ -25,6 +25,7 @@ import com.hearthappy.basic.ext.showAtCenter
 import com.hearthappy.basic.tools.SlideDirection
 import com.hearthappy.loggerx.LoggerX
 import com.hearthappy.loggerx.R
+import com.hearthappy.loggerx.catcher.CrashUploadDispatcher
 import com.hearthappy.loggerx.core.LogScopeProxy
 import com.hearthappy.loggerx.databinding.FragmentLoggerxPreviewBinding
 import com.hearthappy.loggerx.databinding.PopLoggerxHintBinding
@@ -120,6 +121,11 @@ class PreviewLogFragment: AbsBaseFragment<FragmentLoggerxPreviewBinding>() {
                 launch {
                     viewModel.toastEvent.collect {
                         Toast.makeText(requireContext(), it, Toast.LENGTH_SHORT).show()
+                    }
+                }
+                if (LoggerX.getOutputters().getOrNull(outPutterIndex)?.scope?.getTag() == LoggerX.CATCH.getTag()) {
+                    launch {
+                        CrashUploadDispatcher.uploadedIds.collect { viewModel.markCatchUploaded(it) }
                     }
                 }
             }

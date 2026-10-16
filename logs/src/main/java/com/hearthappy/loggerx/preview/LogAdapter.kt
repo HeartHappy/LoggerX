@@ -8,6 +8,7 @@ import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -113,6 +114,7 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
             tvTag.text = String.format(">_  %s", data[LoggerX.COLUMN_TAG])
             tvMethod.text = data[LoggerX.COLUMN_METHOD].toString()
             bindMessage(tvMessage, data)
+            bindUploadIcon(ivCatchUpload, data)
 
             val isImage = LogImageUiHelper.isImageLog(data)
             val hasAttachment = LogImageUiHelper.hasAttachment(data)
@@ -143,10 +145,11 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
             }
         }
 
-        fun unbind() = with(binding.ivImageThumb) {
-            tag = null
-            setImageDrawable(null)
-            setOnClickListener(null)
+        fun unbind() {
+            binding.ivImageThumb.tag = null
+            binding.ivImageThumb.setImageDrawable(null)
+            binding.ivImageThumb.setOnClickListener(null)
+            binding.ivCatchUpload.setOnClickListener(null)
         }
     }
 
@@ -184,17 +187,30 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
                 setOnClickListener(null)
             }
             bindMessage(tvMessage, data)
+            bindUploadIcon(ivCatchUpload, data)
         }
 
-        fun unbind() = with(binding.ivImageThumb) {
-            tag = null
-            setImageDrawable(null)
-            setOnClickListener(null)
+        fun unbind() {
+            binding.ivImageThumb.tag = null
+            binding.ivImageThumb.setImageDrawable(null)
+            binding.ivImageThumb.setOnClickListener(null)
+            binding.ivCatchUpload.setOnClickListener(null)
         }
     }
 
     // 空布局 ViewHolder
     inner class EmptyViewHolder(binding: ItemLogEmptyBinding) : RecyclerView.ViewHolder(binding.root)
+
+    private fun bindUploadIcon(icon : ImageView, data : Map<String, Any>) {
+        val pending = isCatchScope && data.containsKey(LoggerX.COLUMN_ID) && data[LoggerX.COLUMN_UPLOADED]?.toString()?.toIntOrNull() != 1
+        icon.show(pending, showBlock = {
+            setOnClickListener {
+                data[LoggerX.COLUMN_ID]?.toString()?.toIntOrNull()?.let { LoggerX.requestCatchUpload(it) }
+            }
+        }) {
+            setOnClickListener(null)
+        }
+    }
 
     private fun bindMessage(tvMessage : TextView, data : Map<String, Any>) {
         val message = data[LoggerX.COLUMN_MESSAGE]?.toString().orEmpty()

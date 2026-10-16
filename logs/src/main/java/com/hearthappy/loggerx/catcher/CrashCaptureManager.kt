@@ -154,6 +154,7 @@ internal object CrashCaptureManager {
             if (result.systemRecordsSucceeded && systemResult.newestTimestamp > checkpoint) {
                 preferences.edit(commit = true) { putLong(PREF_EXIT_CHECKPOINT, systemResult.newestTimestamp) }
             }
+            CrashUploadDispatcher.dispatchPending()
             result.importedCount
         } catch (throwable: Throwable) {
             Log.e(LoggerX.TAG, "recover crash reports failed: ${throwable.message}", throwable)

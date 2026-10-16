@@ -137,6 +137,7 @@ dependencies {
     implementation libs.androidx.fragment.ktx
     implementation libs.androidx.viewpager2
     implementation libs.lifecycle.runtime.ktx
+    implementation libs.kotlinx.corountines
     implementation libs.lifecycle.viewmodel.ktx
     implementation libs.material
     //作为依赖，需要打包到项目中去，使用api声明，告诉主工程，需要下载api的库，否则，该model的库都不会打包进项目中去
