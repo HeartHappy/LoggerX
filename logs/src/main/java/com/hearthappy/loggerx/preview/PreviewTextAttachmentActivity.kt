@@ -1,9 +1,11 @@
 package com.hearthappy.loggerx.preview
 
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.hearthappy.basic.AbsBaseActivity
 import com.hearthappy.loggerx.LoggerX
+import com.hearthappy.loggerx.R
 import com.hearthappy.loggerx.core.LogScopeProxy
 import com.hearthappy.loggerx.databinding.ActivityPreviewTextAttachmentBinding
 import kotlinx.coroutines.Dispatchers
@@ -37,7 +39,15 @@ class PreviewTextAttachmentActivity : AbsBaseActivity<ActivityPreviewTextAttachm
                 Toast.makeText(this@PreviewTextAttachmentActivity, "崩溃报告读取失败", Toast.LENGTH_SHORT).show()
                 finish()
             } else {
-                tvContent.text = content
+                val scopeTag = LoggerX.getOutputters().getOrNull(outputterIndex)?.scope?.getTag()
+                tvContent.text = if (scopeTag == LoggerX.CATCH.getTag()) {
+                    CatchCallChainHighlighter.highlight(
+                        content,
+                        ContextCompat.getColor(this@PreviewTextAttachmentActivity, R.color.catch_package_highlight)
+                    )
+                } else {
+                    content
+                }
             }
         }
     }

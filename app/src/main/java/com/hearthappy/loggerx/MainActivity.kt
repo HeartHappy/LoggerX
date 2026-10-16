@@ -7,7 +7,8 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import com.hearthappy.basic.AbsBaseActivity
-import com.hearthappy.loggerx.databinding.ActivityMainBinding
+import com.hearthappy.loggerx.app.R
+import com.hearthappy.loggerx.app.databinding.ActivityMainBinding
 import com.hearthappy.loggerx.preview.PreviewLogActivity
 import com.tencent.bugly.crashreport.CrashReport
 import org.json.JSONObject
@@ -35,7 +36,7 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
 
     override fun ActivityMainBinding.initData() {
         // 启动循环插入日志
-        handler.post(logRunnable)
+//        handler.post(logRunnable)
 
         val dbFileSize = LoggerX.getDbFileSize()
         LoggerX.COMMON.i("onCreate: $dbFileSize")

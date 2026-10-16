@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.DialogInterface
 import android.os.Build
 import androidx.appcompat.app.AlertDialog
+import com.hearthappy.loggerx.app.R
 import com.hjq.permissions.IPermissionInterceptor
 import com.hjq.permissions.OnPermissionCallback
 import com.hjq.permissions.Permission

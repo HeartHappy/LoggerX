@@ -9,6 +9,7 @@ import com.hearthappy.loggerx.core.CatchConfig
 import com.hearthappy.loggerx.core.Utils
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import androidx.core.content.edit
 
 internal object CrashCaptureManager {
     private const val PREFS_NAME = "loggerx_catch"
@@ -33,11 +34,12 @@ internal object CrashCaptureManager {
         this.config = config.copy(enabled = true)
         CrashEmergencyStore.updateConfig(this.config)
         val preferences = preferences()
-        val editor = preferences.edit().putBoolean(PREF_ENABLED, true)
-        if (!preferences.contains(PREF_EXIT_CHECKPOINT)) {
-            editor.putLong(PREF_EXIT_CHECKPOINT, System.currentTimeMillis())
+        preferences.edit(commit = true) {
+            putBoolean(PREF_ENABLED, true)
+            if (!preferences.contains(PREF_EXIT_CHECKPOINT)) {
+                putLong(PREF_EXIT_CHECKPOINT, System.currentTimeMillis())
+            }
         }
-        editor.commit()
         if (this.config.captureJvmCrashes && installedHandler == null) {
             val handler = CatchExceptionHandler(Thread.getDefaultUncaughtExceptionHandler())
             installedHandler = handler
@@ -48,7 +50,7 @@ internal object CrashCaptureManager {
     @Synchronized
     fun disable() {
         if (!CrashEnvironment.isInitialized()) return
-        preferences().edit().putBoolean(PREF_ENABLED, false).commit()
+        preferences().edit(commit = true) { putBoolean(PREF_ENABLED, false) }
         val handler = installedHandler
         if (handler != null && Thread.getDefaultUncaughtExceptionHandler() === handler) {
             Thread.setDefaultUncaughtExceptionHandler(handler.previous)
@@ -150,7 +152,7 @@ internal object CrashCaptureManager {
             for (record in systemResult.records) inputs += CrashReportImporter.Input(record, null)
             val result = CrashReportImporter.import(inputs)
             if (result.systemRecordsSucceeded && systemResult.newestTimestamp > checkpoint) {
-                preferences.edit().putLong(PREF_EXIT_CHECKPOINT, systemResult.newestTimestamp).commit()
+                preferences.edit(commit = true) { putLong(PREF_EXIT_CHECKPOINT, systemResult.newestTimestamp) }
             }
             result.importedCount
         } catch (throwable: Throwable) {

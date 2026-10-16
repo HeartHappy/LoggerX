@@ -8,9 +8,10 @@ plugins {
 
 android {
 
-    namespace 'com.hearthappy.loggerx'
+    namespace 'com.hearthappy.loggerx.app'
     compileSdk 31
     defaultConfig {
+        applicationId 'com.hearthappy.loggerx'
         minSdk 23
         versionCode 1
         versionName "1.0"

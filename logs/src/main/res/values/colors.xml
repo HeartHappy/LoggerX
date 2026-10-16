@@ -8,4 +8,5 @@
     <color name="divider_gray">#E0E0E0</color>
     <color name="text_primary">#1F1F1F</color>
     <color name="text_secondary">#661F1F1F</color>
+    <color name="catch_package_highlight">#FFFFD54F</color>
 </resources>

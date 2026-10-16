@@ -1,11 +1,16 @@
 package com.hearthappy.loggerx.preview
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -13,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hearthappy.basic.ext.dp
 import com.hearthappy.basic.ext.show
 import com.hearthappy.loggerx.LoggerX
+import com.hearthappy.loggerx.R
 import com.hearthappy.loggerx.core.LogLevel
 import com.hearthappy.loggerx.image.LogImageLoaderFactory
 import com.hearthappy.loggerx.databinding.ItemLogEmptyBinding
@@ -22,6 +28,14 @@ import com.hearthappy.loggerx.databinding.ItemLogStreamlineListBinding
 class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<Map<String, Any>, RecyclerView.ViewHolder>(LogDiffCallback) {
 
     var isSimplified = false
+
+    private val isCatchScope : Boolean by lazy {
+        LoggerX.getOutputters().getOrNull(outPutterIndex)?.scope?.getTag() == LoggerX.CATCH.getTag()
+    }
+
+    private val catchPackageColor : Int by lazy {
+        ContextCompat.getColor(context, R.color.catch_package_highlight)
+    }
 
     init {
         setHasStableIds(true)
@@ -98,7 +112,7 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
             level2Color(tvLevel, data[LoggerX.COLUMN_LEVEL].toString())
             tvTag.text = String.format(">_  %s", data[LoggerX.COLUMN_TAG])
             tvMethod.text = data[LoggerX.COLUMN_METHOD].toString()
-            tvMessage.text = data[LoggerX.COLUMN_MESSAGE].toString()
+            bindMessage(tvMessage, data)
 
             val isImage = LogImageUiHelper.isImageLog(data)
             val hasAttachment = LogImageUiHelper.hasAttachment(data)
@@ -169,7 +183,7 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
                 setImageDrawable(null)
                 setOnClickListener(null)
             }
-            tvMessage.text = data[LoggerX.COLUMN_MESSAGE].toString()
+            bindMessage(tvMessage, data)
         }
 
         fun unbind() = with(binding.ivImageThumb) {
@@ -181,6 +195,20 @@ class LogAdapter(val context : Context, val outPutterIndex : Int) : ListAdapter<
 
     // 空布局 ViewHolder
     inner class EmptyViewHolder(binding: ItemLogEmptyBinding) : RecyclerView.ViewHolder(binding.root)
+
+    private fun bindMessage(tvMessage : TextView, data : Map<String, Any>) {
+        val message = data[LoggerX.COLUMN_MESSAGE]?.toString().orEmpty()
+        tvMessage.text = if (isCatchScope) CatchCallChainHighlighter.highlight(message, catchPackageColor) else message
+        tvMessage.setOnLongClickListener { copyLogMessage(it, message) }
+    }
+
+    private fun copyLogMessage(view : View, message : String) : Boolean {
+        if (message.isEmpty()) return false
+        val clipboard = view.context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+        clipboard.setPrimaryClip(ClipData.newPlainText("log_message", message))
+        Toast.makeText(view.context, R.string.log_message_copied, Toast.LENGTH_SHORT).show()
+        return true
+    }
 
     private fun level2Color(tvLevel : TextView, level : String, isBackground: Boolean = true) {
         val baseColor = when (level) {
