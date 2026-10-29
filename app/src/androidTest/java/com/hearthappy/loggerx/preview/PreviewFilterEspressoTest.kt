@@ -12,7 +12,7 @@ class PreviewFilterEspressoTest {
 
     @Before
     fun prepareData() {
-        LoggerX.COMMON.clearAllLogs()
+        LoggerX.COMMON.clear()
         TagALogger.logDebug()
         TagBLogger.logInfo()
         TagALogger.logDebug()

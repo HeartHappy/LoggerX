@@ -3,6 +3,8 @@ package com.hearthappy.loggerx.catcher
 import android.util.Log
 import com.hearthappy.loggerx.LoggerX
 import com.hearthappy.loggerx.db.LogDbManager
+import com.hearthappy.loggerx.listener.CrashListener
+import com.hearthappy.loggerx.model.CrashUploadRequest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,15 +23,15 @@ internal object CrashUploadDispatcher {
     val uploadedIds: SharedFlow<Int> = uploadedIdsFlow.asSharedFlow()
 
     @Volatile
-    private var callback: CrashUploadCallback? = null
+    private var listener: CrashListener? = null
 
-    fun setCallback(callback: CrashUploadCallback?) {
-        this.callback = callback
-        if (callback != null) dispatchPending()
+    fun setListener(listener: CrashListener?) {
+        this.listener = listener
+        if (listener != null) dispatchPending()
     }
 
     fun dispatchPending() {
-        if (callback == null) return
+        if (listener == null) return
         scope.launch {
             for (row in LogDbManager.queryUnuploadedCatchLogs()) {
                 upload(row)
@@ -38,8 +40,8 @@ internal object CrashUploadDispatcher {
     }
 
     fun request(logId: Int) {
-        if (callback == null) {
-            Log.w(LoggerX.TAG, "catch upload ignored, callback is not set")
+        if (listener == null) {
+            Log.w(LoggerX.TAG, "catch upload ignored, listener is not set")
             return
         }
         scope.launch {
@@ -50,11 +52,11 @@ internal object CrashUploadDispatcher {
 
     private suspend fun upload(row: Map<String, Any>) {
         val request = row.toUploadRequest() ?: return
-        val current = callback ?: return
+        val current = listener ?: return
         if (!inFlight.add(request.id)) return
         try {
-            val accepted = runCatching { current.onUploadRequired(request) }
-                .onFailure { Log.e(LoggerX.TAG, "crash upload callback failed: ${it.message}", it) }
+            val accepted = runCatching { current.onCrash(request) }
+                .onFailure { Log.e(LoggerX.TAG, "LoggerX listener failed: ${it.message}", it) }
                 .getOrDefault(false)
             if (accepted && LogDbManager.markCatchUploaded(request.id)) {
                 uploadedIdsFlow.emit(request.id)

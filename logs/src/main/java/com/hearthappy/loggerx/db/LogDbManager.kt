@@ -10,6 +10,7 @@ import com.hearthappy.loggerx.core.DataQueryService
 import com.hearthappy.loggerx.core.FileLogStorageManager
 import com.hearthappy.loggerx.core.FileLogWriteException
 import com.hearthappy.loggerx.core.ImagePreviewData
+import com.hearthappy.loggerx.listener.LoggerXListenerDispatcher
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,7 +48,7 @@ internal object LogDbManager {
         val tableName = getTableName(scopeTag)
         try {
             ensureTable(tableName)
-            database.insertOrThrow(tableName, null, ContentValues().apply {
+            val rowId = database.insertOrThrow(tableName, null, ContentValues().apply {
                 put(LoggerX.COLUMN_LEVEL, level)
                 put(LoggerX.COLUMN_TAG, classTag)
                 put(LoggerX.COLUMN_METHOD, method)
@@ -57,6 +58,9 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_EVENT_ID, "")
             })
             notifyDataChanged()
+            queryLogById(tableName, rowId.toInt())?.let { row ->
+                LoggerXListenerDispatcher.notifyLogInserted(scopeTag, row)
+            }
         } catch (e: Exception) {
             Log.e(LoggerX.TAG, "insertLog failed: ${e.message}")
         }
@@ -78,7 +82,9 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_EVENT_ID, "")
             })
             notifyDataChanged()
-            queryLogById(tableName, rowId.toInt()) ?: throw FileLogWriteException("写入文件日志失败，请稍后重试")
+            val row = queryLogById(tableName, rowId.toInt()) ?: throw FileLogWriteException("写入文件日志失败，请稍后重试")
+            LoggerXListenerDispatcher.notifyLogInserted(scopeTag, row)
+            row
         } catch (e: Exception) {
             managedFile.file.delete()
             Log.e(LoggerX.TAG, "insertFileLog failed: ${e.message}")
@@ -110,7 +116,12 @@ internal object LogDbManager {
                 put(LoggerX.COLUMN_EVENT_ID, eventId)
                 put(LoggerX.COLUMN_UPLOADED, 0)
             }, android.database.sqlite.SQLiteDatabase.CONFLICT_IGNORE)
-            if (rowId != -1L) notifyDataChanged()
+            if (rowId != -1L) {
+                notifyDataChanged()
+                queryLogById(tableName, rowId.toInt())?.let { row ->
+                    LoggerXListenerDispatcher.notifyLogInserted(LoggerX.CATCH.getTag(), row)
+                }
+            }
             rowId != -1L || eventExists(tableName, eventId)
         }.onFailure {
             Log.e(LoggerX.TAG, "insertCatchLog failed: ${it.message}", it)

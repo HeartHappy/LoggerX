@@ -10,6 +10,22 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
 object DataQueryService {
+    /**
+     * 异步日志查询参数。
+     *
+     * @property time 日期或时间前缀筛选条件，为 null 时不限时间。
+     * @property tag 日志标签精确筛选条件，为 null 时不限标签。
+     * @property level 日志等级精确筛选条件，为 null 时不限等级。
+     * @property method 方法名模糊筛选条件，为 null 时不限方法。
+     * @property isImage true 仅查询图片日志，false 排除图片日志，null 不限制。
+     * @property keyword 日志正文模糊搜索关键字，为 null 时不搜索。
+     * @property sortAsc 是否按时间与主键升序排列；默认倒序显示最新日志。
+     * @property page 页码，从 1 开始；未使用锚点分页时生效。
+     * @property pageSize 每页最大记录数。
+     * @property anchorTime 锚点分页的上一页末条时间，为 null 时使用页码分页。
+     * @property anchorId 锚点分页的上一页末条主键，需与 anchorTime 同时提供。
+     * @property includeImagePayload 预留的图片内容加载开关；当前查询结果仅返回文件路径。
+     */
     data class QueryRequest(
         val time: String? = null,
         val tag: String? = null,
@@ -25,6 +41,15 @@ object DataQueryService {
         val includeImagePayload: Boolean = false
     )
 
+    /**
+     * 异步查询进度。
+     *
+     * @property queryId 查询任务唯一标识。
+     * @property percent 当前进度百分比，范围为 0 到 100。
+     * @property stage 当前执行阶段名称。
+     * @property cancelable 当前任务是否允许取消。
+     * @property fromCache 进度对应的结果是否来自内存缓存。
+     */
     data class QueryProgress(
         val queryId: String,
         val percent: Int,
@@ -33,6 +58,13 @@ object DataQueryService {
         val fromCache: Boolean = false
     )
 
+    /**
+     * 异步查询成功结果。
+     *
+     * @property queryId 查询任务唯一标识。
+     * @property pageResult 分页数据与下一页锚点信息。
+     * @property fromCache 结果是否来自内存缓存。
+     */
     data class QueryResult(
         val queryId: String,
         val pageResult: QueryPageResult,

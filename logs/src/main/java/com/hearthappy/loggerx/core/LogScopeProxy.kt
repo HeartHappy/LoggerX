@@ -6,10 +6,42 @@ import com.hearthappy.loggerx.db.LogDbManager
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
+/**
+ * 图片附件预览信息。
+ *
+ * @property filePath 图片文件绝对路径。
+ * @property mimeType 图片 MIME 类型。
+ */
 data class ImagePreviewData(val filePath: String, val mimeType: String)
+
+/**
+ * 通用附件预览信息。
+ *
+ * @property filePath 附件文件绝对路径。
+ * @property mimeType 附件 MIME 类型。
+ */
 data class AttachmentPreviewData(val filePath: String, val mimeType: String)
 
-data class FileLogEntry(val id: Int, val time: String, val level: String, val tag: String, val method: String, val message: String, val filePath: String)
+/**
+ * 文件日志成功写入后的结果。
+ *
+ * @property id 当前作用域日志表中的主键。
+ * @property time 日志入库时间。
+ * @property level 日志等级。
+ * @property tag 产生日志的类标签。
+ * @property method 产生日志的方法信息。
+ * @property message 文件日志说明文本。
+ * @property filePath LoggerX 持久化后的文件绝对路径。
+ */
+data class FileLogEntry(
+    val id: Int,
+    val time: String,
+    val level: String,
+    val tag: String,
+    val method: String,
+    val message: String,
+    val filePath: String
+)
 
 /**
  * Scope代理类：封装不同等级的日志调用
@@ -66,10 +98,6 @@ class LogScopeProxy(private val scope: String): LogScope {
 
     fun deleteLogs(time: String? = null): Int {
         return LogDbManager.deleteLogs(scope, time)
-    }
-
-    fun clearAllLogs(): Boolean {
-        return LogDbManager.clearAllLogs()
     }
 
     fun loadImagePreviewData(logId: Int): ImagePreviewData? {

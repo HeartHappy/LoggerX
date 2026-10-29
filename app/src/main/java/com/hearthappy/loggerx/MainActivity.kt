@@ -63,10 +63,8 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         LoggerX.COMMON.d("common onCreate d")
         LoggerX.COMMON.i("common onCreate i")
         LoggerX.COMMON.w("common onCreate w")
-
         // Log important information
         LoggerX.IMPORTANT.d("important onCreate d 挺不错的，哈哈")
-
         // Log kernel related events
         LoggerX.KERNEL.d("kernel onCreate d")
         LoggerX.KERNEL.w("kernel onResume w")
