@@ -1,0 +1,1 @@
+-keep class com.hearthappy.loggerx.catcher.NativeCrashBridge { *; }

@@ -56,7 +56,11 @@ internal object TombstoneCollector {
 
     private fun readWithRoot(packageName: String, afterTimestamp: Long, maxReportBytes: Int): List<CrashRecord> {
         val su = findSu()
-        val dump = exec(su, dumpScript(), ROOT_TIMEOUT_MS, dumpLimit(maxReportBytes)) ?: return emptyList()
+        val script = dumpScript()
+        val limit = dumpLimit(maxReportBytes)
+        val dump = exec(listOf(su, "-c", script), ROOT_TIMEOUT_MS, limit)
+            ?: exec(listOf(su, "0", "/system/bin/sh", "-c", script), ROOT_TIMEOUT_MS, limit)
+            ?: return emptyList()
         val records = mutableListOf<CrashRecord>()
         for (part in dump.split(FILE_MARKER)) {
             val lineBreak = part.indexOf('\n')
@@ -87,9 +91,9 @@ internal object TombstoneCollector {
             "echo; done"
     }
 
-    private fun exec(program: String, command: String, timeoutMs: Long, maxBytes: Int): String? {
+    private fun exec(argv: List<String>, timeoutMs: Long, maxBytes: Int): String? {
         val process = try {
-            ProcessBuilder(program, "-c", command).redirectErrorStream(true).start()
+            ProcessBuilder(argv).redirectErrorStream(true).start()
         } catch (io: IOException) {
             Log.w(LoggerX.TAG, "su unavailable, tombstone root read skipped")
             return null

@@ -10,6 +10,7 @@ android {
 
     namespace 'com.hearthappy.loggerx.app'
     compileSdk 31
+    ndkVersion "21.4.7075529"
     defaultConfig {
         applicationId 'com.hearthappy.loggerx'
         minSdk 23
@@ -17,6 +18,17 @@ android {
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            ndkBuild {
+                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        ndkBuild {
+            path "src/main/cpp/Android.mk"
+        }
     }
 
     buildTypes {

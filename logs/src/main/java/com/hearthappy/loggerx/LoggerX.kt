@@ -123,6 +123,16 @@ class LoggerX {
             CrashCaptureManager.disable()
         }
 
+        /**
+         * 在其它崩溃 SDK 初始化之后再次安装 native 信号捕获。
+         *
+         * [init] 已经会安装一次。如果随后初始化的 SDK 替换了信号处理器，在它之后再调用本方法，
+         * LoggerX 会先把崩溃写到应用私有目录，再交给前一个处理器。
+         */
+        fun installNativeCrashCapture() {
+            CrashCaptureManager.installNativeCapture()
+        }
+
 
         /**
          * 立即扫描并归档待处理崩溃记录。
