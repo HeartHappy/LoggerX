@@ -9,6 +9,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.StringReader
 import java.io.StringWriter
+import javax.xml.XMLConstants
 import javax.xml.transform.OutputKeys
 import javax.xml.transform.Source
 import javax.xml.transform.TransformerException
@@ -56,14 +57,12 @@ internal class LogImpl(private var scope: LogScope, private val interceptor: Log
                 val result = j.trim { it <= ' ' }
                 if (result.startsWith("{")) {
                     val jsonObject = JSONObject(result)
-                    val message = jsonObject.toString(JSON_INDENT)
-                    d(message)
+                    d(unescapeSolidus(jsonObject.toString(JSON_INDENT)))
                     return
                 }
                 if (result.startsWith("[")) {
                     val jsonArray = JSONArray(result)
-                    val message = jsonArray.toString(JSON_INDENT)
-                    d(message)
+                    d(unescapeSolidus(jsonArray.toString(JSON_INDENT)))
                     return
                 }
                 e("Invalid Json")
@@ -78,7 +77,12 @@ internal class LogImpl(private var scope: LogScope, private val interceptor: Log
             try {
                 val xmlInput: Source = StreamSource(StringReader(it))
                 val xmlOutput = StreamResult(StringWriter())
-                val transformer = TransformerFactory.newInstance().newTransformer()
+                val factory = TransformerFactory.newInstance()
+                runCatching { factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+                // Android SDK 的 XMLConstants 没有这两个 API 24 字段，用属性名字符串，旧版本解析器不支持时直接跳过。
+                runCatching { factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "") }
+                runCatching { factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalStylesheet", "") }
+                val transformer = factory.newTransformer()
                 transformer.setOutputProperty(OutputKeys.INDENT, "yes")
                 transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2")
                 transformer.transform(xmlInput, xmlOutput)
@@ -117,6 +121,12 @@ internal class LogImpl(private var scope: LogScope, private val interceptor: Log
         val message = createMessage(msg, *args)
         log(priority, message, throwable)
     }
+
+    /**
+     * org.json 会把 `/` 转义成 `\/`。JSON 里这组字符只表示斜杠，还原后 URL 保持 `https://`。
+     * 内容里真正的反斜杠仍是 `\\`，不会被这次替换吃掉。
+     */
+    private fun unescapeSolidus(json: String): String = json.replace("\\/", "/")
 
     private fun formatTag(tag: String?): String {
         return tag?.run { this } ?: LoggerX.TAG

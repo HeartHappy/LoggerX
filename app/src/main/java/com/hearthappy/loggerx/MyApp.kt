@@ -5,6 +5,7 @@ import android.util.Log
 import com.hearthappy.basic.tools.screenadaptation.ScreenAdaptHelper
 import com.hearthappy.loggerx.catcher.CrashSource
 import com.hearthappy.loggerx.core.CatchConfig
+import com.hearthappy.loggerx.core.OutputConfig
 import com.hearthappy.loggerx.interceptor.LogInterceptorAdapter
 import com.hearthappy.loggerx.model.CrashUploadRequest
 import com.tencent.bugly.crashreport.CrashReport
@@ -14,7 +15,7 @@ class MyApp: Application() {
 
     override fun onCreate() {
         super.onCreate() //日志框架初始化
-        LoggerX.init(this, catchConfig = CatchConfig(enabled = true))
+        LoggerX.init(this, OutputConfig(catchConfig = CatchConfig(enabled = true)))
         LoggerX.registerScope(LogInterceptorAdapter(), CUSTOM_SCOPE)
         ScreenAdaptHelper.setup(this) // 开启按日期自动清理，保留 7 天数据
         LoggerX.enableAutoClean(7)

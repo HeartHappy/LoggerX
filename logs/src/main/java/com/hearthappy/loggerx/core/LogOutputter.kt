@@ -17,4 +17,12 @@ class LogOutputter(val scope: LogScope, private val logInterceptor: LogIntercept
     internal fun output(level: LogLevel, message: String, throwable: Throwable? = null) {
         logImpl.log(level.level, message, throwable)
     }
+
+    internal fun json(json: String?) {
+        logImpl.json(json)
+    }
+
+    internal fun xml(xml: String?) {
+        logImpl.xml(xml)
+    }
 }

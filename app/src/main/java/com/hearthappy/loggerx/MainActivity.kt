@@ -4,8 +4,8 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.view.View
 import android.widget.Toast
+import androidx.recyclerview.widget.DividerItemDecoration
 import com.hearthappy.basic.AbsBaseActivity
 import com.hearthappy.loggerx.app.R
 import com.hearthappy.loggerx.app.databinding.ActivityMainBinding
@@ -19,34 +19,55 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
     private val handler = Handler(Looper.getMainLooper())
     private var logCount = 0
 
-    private val logRunnable = object: Runnable {
-        override fun run() {
-            val message = "测试日志消息 $logCount - ${System.currentTimeMillis()}"
-            LoggerX.COMMON.i("testMethod:$message")
-            logCount++
-            if (logCount % 100 == 0) {
-                Log.d(TAG, "Inserted $logCount logs.")
-            }
-            handler.postDelayed(this, 100) // 每100毫秒插入一条日志
-        }
+    private val optionsAdapter by lazy { OptionsAdapter() }
+
+    private val items = mutableListOf<OptionsItem>().apply {
+        add(OptionsItem("输出普通等级日志", 0))
+        add(OptionsItem("输出json格式日志", 1))
+        add(OptionsItem("输出xml格式日志", 2))
+        add(OptionsItem("删除指定（KERNEL，ERROR）日志文件", 3))
+        add(OptionsItem("删除所有日志文件", 4))
+        add(OptionsItem("打开指定日志文件", 5))
+        add(OptionsItem("分享", 6))
+        add(OptionsItem("数据库查询 / 日志预览", 7))
+        add(OptionsItem("记录非致命异常", 8))
+        add(OptionsItem("归档 CATCH 日志", 9))
+        add(OptionsItem("触发主线程 Java 崩溃", 10))
+        add(OptionsItem("触发后台线程 Java 崩溃", 11))
+        add(OptionsItem("触发 Bugly Native 崩溃", 12))
     }
 
-
-
-
-    override fun ActivityMainBinding.initData() {
-        // 启动循环插入日志
-//        handler.post(logRunnable)
+    override fun ActivityMainBinding.initData() { // 启动循环插入日志
+        //        handler.post(logRunnable)
 
         val dbFileSize = LoggerX.getDbFileSize()
         LoggerX.COMMON.i("onCreate: $dbFileSize")
     }
 
     override fun ActivityMainBinding.initListener() {
+        optionsAdapter.setOnItemClickListener { _, _, _, position ->
+            when (position) {
+                0 -> outLogAndFile()
+                1 -> outJson()
+                2 -> outXml()
+                3 -> deleteLogFile()
+                4 -> deleteAllLogFile()
+                5 -> openFile()
+                6 -> shareFile()
+                7 -> previewLogs()
+                8 -> recordException()
+                9 -> recoverCrashLogs()
+                10 -> testJavaCrash()
+                11 -> testBackgroundCrash()
+                12 -> testNativeCrash()
+            }
+        }
     }
 
     override fun ActivityMainBinding.initView() {
-
+        rvOptionsList.adapter = optionsAdapter
+        rvOptionsList.addItemDecoration(DividerItemDecoration(this@MainActivity,DividerItemDecoration.VERTICAL))
+        optionsAdapter.initData(items)
     }
 
     override fun ActivityMainBinding.initViewModelListener() {
@@ -58,14 +79,12 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
     }
 
 
-    fun outLogAndFile(view: View) { // Log common test messages
+    fun outLogAndFile() { // Log common test messages
         LoggerX.COMMON.d("common test")
         LoggerX.COMMON.d("common onCreate d")
         LoggerX.COMMON.i("common onCreate i")
-        LoggerX.COMMON.w("common onCreate w")
-        // Log important information
-        LoggerX.IMPORTANT.d("important onCreate d 挺不错的，哈哈")
-        // Log kernel related events
+        LoggerX.COMMON.w("common onCreate w") // Log important information
+        LoggerX.IMPORTANT.d("important onCreate d 挺不错的，哈哈") // Log kernel related events
         LoggerX.KERNEL.d("kernel onCreate d")
         LoggerX.KERNEL.w("kernel onResume w")
         LoggerX.KERNEL.i("kernel onCreate1 i")
@@ -87,27 +106,35 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         LoggerX.COMMON.image(copyResourceToTempFile(R.mipmap.test2, "test2.jpg"), message = "壁纸图2：")
     }
 
-    fun deleteLogFile(view: View) {
+    fun outJson() {
+        LoggerX.IMPORTANT.json("{\"title\":\"json解析\",\"json.url\":\"https://anovator.com/\",\"keywords\":\"Android日志框架\",\"功能\":[\"JSON美化\",\"JSON数据类型显示\",\"JSON数组显示角标\",\"高亮显示\",\"错误提示\",{\"备注\":[\"框架地址\",\"https://github.com/HeartHappy/LoggerX\"]}],\"联系方式\":{\"github\":\"https://github.com/HeartHappy/LoggerX/issues\"}}")
+    }
+
+    fun outXml() {
+        LoggerX.IMPORTANT.xml("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" + "<config>\n" + "    <database>\n" + "        <host>localhost</host>\n" + "        <port>3306</port>\n" + "        <username>root</username>\n" + "        <password>123456</password>\n" + "    </database>\n" + "    <server>\n" + "        <port>8080</port>\n" + "        <timeout>30</timeout>\n" + "    </server>\n" + "</config>\n")
+    }
+
+    fun deleteLogFile() {
         val kernelRows = LoggerX.KERNEL.deleteLogs()
         val commonRows = LoggerX.ERROR.deleteLogs()
         Toast.makeText(this, "已删除 KERNEL:$kernelRows, ERROR:$commonRows", Toast.LENGTH_SHORT).show()
     }
 
-    fun deleteAllLogFile(view: View) {
+    fun deleteAllLogFile() {
         val clearAll = LoggerX.clear()
-        LoggerX.COMMON.d("已清空所有日志")
+        LoggerX.COMMON.d("已清空所有日志:$clearAll")
     }
 
-    fun openFile(view: View) {
+    fun openFile() {
         LoggerX.KERNEL.doExportAndShare(exportAll = false, limit = 500)
         Toast.makeText(this, "已从数据库导出最近日志并调用分享", Toast.LENGTH_SHORT).show()
     }
 
-    fun queryDBLogs(view: View) {
+    fun previewLogs() {
         startActivity(Intent(this, PreviewLogActivity::class.java))
     }
 
-    fun shareFile(view: View) {
+    fun shareFile() {
         LoggerX.COMMON.i("测试==========")
         LoggerX.COMMON.doExportAndShare()
         LoggerX.exportAndShareAll {
@@ -115,35 +142,35 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         }
     }
 
-    fun testJavaCrash(view: View) {
+    fun testJavaCrash() {
         LoggerX.COMMON.i("即将触发主线程 Java 崩溃")
         handler.postDelayed({
             throw IllegalStateException("LoggerX demo main-thread Java crash")
         }, 300)
     }
 
-    fun testBackgroundCrash(view: View) {
+    fun testBackgroundCrash() {
         LoggerX.COMMON.i("即将触发后台线程 Java 崩溃")
         Thread({
             throw IllegalArgumentException("LoggerX demo background-thread Java crash")
         }, "loggerx-crash-worker").start()
     }
 
-    fun testNativeCrash(view: View) {
+    fun testNativeCrash() {
         LoggerX.COMMON.i("即将通过 Bugly 触发 Native 崩溃")
         LoggerX.traceNativeCall {
             CrashReport.testNativeCrash()
         }
     }
 
-    fun testCaughtException(view: View) {
+    fun recordException() {
         val throwable = IllegalStateException("LoggerX demo caught exception")
         LoggerX.recordException(throwable, "Demo 主动记录的非致命异常")
         CrashReport.postCatchedException(throwable)
         Toast.makeText(this, "已写入 CATCH", Toast.LENGTH_SHORT).show()
     }
 
-    fun recoverCrashLogs(view: View) {
+    fun recoverCrashLogs() {
         val count = LoggerX.recoverCatchLogs()
         Toast.makeText(this, "本次归档 $count 条 CATCH 日志", Toast.LENGTH_SHORT).show()
     }
@@ -159,8 +186,21 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         }
         return target
     }
+
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(logRunnable)
+    }
+
+    private val logRunnable = object: Runnable {
+        override fun run() {
+            val message = "测试日志消息 $logCount - ${System.currentTimeMillis()}"
+            LoggerX.COMMON.i("testMethod:$message")
+            logCount++
+            if (logCount % 100 == 0) {
+                Log.d(TAG, "Inserted $logCount logs.")
+            }
+            handler.postDelayed(this, 100) // 每100毫秒插入一条日志
+        }
     }
 }

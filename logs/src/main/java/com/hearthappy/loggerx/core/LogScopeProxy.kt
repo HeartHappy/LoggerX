@@ -59,9 +59,13 @@ class LogScopeProxy(private val scope: String): LogScope {
 
     fun wtf(message: String) = output(LogLevel.ASSERT, message)
 
-    fun json(json: String?) = output(LogLevel.DEBUG, json ?: "Empty JSON")
+    fun json(json: String?) {
+        LogOutputterManager.getOutputter(scope).json(json)
+    }
 
-    fun xml(xml: String?) = output(LogLevel.DEBUG, xml ?: "Empty XML")
+    fun xml(xml: String?) {
+        LogOutputterManager.getOutputter(scope).xml(xml)
+    }
 
     fun image(imageFilePath: String, message: String = "file-log"): FileLogEntry {
         return writeFileLog(FileLogStorageManager.validateSource(imageFilePath), message)

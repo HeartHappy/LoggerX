@@ -98,17 +98,19 @@ class LoggerX {
          *
          * @param context Application 或能够获取 Application 的 Context。
          * @param outputConfig 日志输出、数据库写入、文件目录及崩溃捕获配置。
-         * @param catchConfig 崩溃捕获配置。
          * @throws IllegalArgumentException 当无法从 [context] 获取 Application 时抛出。
          *
          */
-        fun init(context: Context, outputConfig: OutputConfig = OutputConfig(),catchConfig: CatchConfig = CatchConfig(enabled = false)) {
+        fun init(context: Context, outputConfig: OutputConfig = OutputConfig()) {
             val application = (context.applicationContext as? Application) ?: (context as? Application) ?: throw IllegalArgumentException("LoggerX.init requires an Application context")
             ContextHolder.init(application)
             this.outputConfig = outputConfig
+            val catchConfig = outputConfig.catchConfig
             LogOutputterManager.initDefaultOutputters(outputConfig)
-            CrashCaptureManager.initialize(application, outputConfig.catchConfig)
-            enableCatch(catchConfig)
+            CrashCaptureManager.initialize(application, catchConfig)
+            if(catchConfig.enabled){
+                enableCatch(catchConfig)
+            }
         }
 
 
