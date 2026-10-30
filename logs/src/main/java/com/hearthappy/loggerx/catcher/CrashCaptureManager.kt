@@ -26,18 +26,19 @@ internal object CrashCaptureManager {
         this.config = config
         CrashEmergencyStore.initialize(application, config)
         LogDbManager.prepareCatchTable()
+        if (!config.enabled) disable()
         recover()
         if (config.enabled) enable(config)
     }
 
     @Synchronized
-    fun enable(config: CatchConfig = CatchConfig(enabled = true)) {
+    fun enable(config: CatchConfig) {
         check(CrashEnvironment.isInitialized()) { "LoggerX.init() must be called before enabling crash capture" }
-        this.config = config.copy(enabled = true)
+        this.config = config
         CrashEmergencyStore.updateConfig(this.config)
         val preferences = preferences()
         preferences.edit(commit = true) {
-            putBoolean(PREF_ENABLED, true)
+            putBoolean(PREF_ENABLED,config.enabled)
             if (!preferences.contains(PREF_EXIT_CHECKPOINT)) {
                 putLong(PREF_EXIT_CHECKPOINT, System.currentTimeMillis())
             }
@@ -144,7 +145,7 @@ internal object CrashCaptureManager {
         return try {
             val preferences = preferences()
             val checkpoint = preferences.getLong(PREF_EXIT_CHECKPOINT, System.currentTimeMillis())
-            val systemResult = if (preferences.getBoolean(PREF_ENABLED, config.enabled)) {
+            val systemResult = if (config.enabled) {
                 SystemExitInfoCollector.collect(CrashEnvironment.application, checkpoint, config)
             } else {
                 SystemExitInfoCollector.Result(emptyList(), checkpoint)

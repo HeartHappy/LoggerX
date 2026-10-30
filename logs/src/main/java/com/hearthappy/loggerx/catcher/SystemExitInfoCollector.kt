@@ -15,10 +15,13 @@ internal object SystemExitInfoCollector {
     data class Result(val records: List<CrashRecord>, val newestTimestamp: Long)
 
     fun collect(application: Application, afterTimestamp: Long, config: CatchConfig): Result {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || !config.captureSystemExitInfo) {
+        if (!config.captureSystemExitInfo) {
             return Result(emptyList(), afterTimestamp)
         }
-        return collectApi30(application, afterTimestamp, config.maxReportBytes)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return collectApi30(application, afterTimestamp, config.maxReportBytes)
+        }
+        return TombstoneCollector.collect(application, afterTimestamp, config.maxReportBytes)
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
