@@ -48,6 +48,7 @@ internal object CrashCaptureManager {
             installedHandler = handler
             Thread.setDefaultUncaughtExceptionHandler(handler)
         }
+        installNativeCapture()
     }
 
     @Synchronized
@@ -60,6 +61,12 @@ internal object CrashCaptureManager {
         }
         installedHandler = null
         config = config.copy(enabled = false)
+        NativeCrashCapture.uninstall()
+    }
+
+    fun installNativeCapture() {
+        if (!CrashEnvironment.isInitialized() || !config.enabled) return
+        NativeCrashCapture.install(CrashEmergencyStore.nativeCrashDirectory(), CrashEnvironment.processName())
     }
 
     fun isEnabled(): Boolean {
@@ -153,6 +160,7 @@ internal object CrashCaptureManager {
             val inputs = CrashEmergencyStore.loadPending()
                 .map { CrashReportImporter.Input(it.record, it.file) }
                 .toMutableList()
+            inputs += NativeCrashReportLoader.load(CrashEmergencyStore.nativeCrashDirectory())
             for (record in systemResult.records) inputs += CrashReportImporter.Input(record, null)
             val result = CrashReportImporter.import(inputs)
             if (result.systemRecordsSucceeded && systemResult.newestTimestamp > checkpoint) {

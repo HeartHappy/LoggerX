@@ -14,6 +14,7 @@ internal object CrashEmergencyStore {
 
     private lateinit var pendingDir: File
     private lateinit var reportDir: File
+    private lateinit var nativeDir: File
     private var maxReportBytes: Int = 1024 * 1024
     private var maxPendingReports: Int = 32
 
@@ -22,9 +23,12 @@ internal object CrashEmergencyStore {
         val root = File(application.noBackupFilesDir, "loggerx/catch")
         pendingDir = ensureDirectory(File(root, "pending"))
         reportDir = ensureDirectory(File(root, "reports"))
+        nativeDir = ensureDirectory(File(root, "native"))
         updateConfig(config)
         trimPendingFiles()
     }
+
+    fun nativeCrashDirectory(): File = nativeDir
 
     @Synchronized
     fun updateConfig(config: CatchConfig) {

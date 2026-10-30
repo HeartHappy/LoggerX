@@ -25,28 +25,28 @@ class MyApp: Application() {
 
 
         //崩溃日志捕获
-        val userStrategy = CrashReport.UserStrategy(this@MyApp)
-        userStrategy.crashHandleCallback = object : CrashReport.CrashHandleCallback() {
-            override fun onCrashHandleStart(crashType: Int,
-                errorType: String?,
-                errorMessage: String?,
-                errorStack: String?): Map<String?, String?> {
-                val source = when (crashType) {
-                    0 -> CrashSource.BUGLY_JAVA
-                    1 -> CrashSource.BUGLY_CAUGHT
-                    2 -> CrashSource.BUGLY_NATIVE
-                    else -> CrashSource.EXTERNAL
-                }
-                LoggerX.reportExternalCrash(
-                    source = source,
-                    crashType = crashType,
-                    errorType = errorType,
-                    errorMessage = errorMessage,
-                    errorStack = errorStack
-                )
-                return emptyMap()
-            }
-        }
+//        val userStrategy = CrashReport.UserStrategy(this@MyApp)
+//        userStrategy.crashHandleCallback = object : CrashReport.CrashHandleCallback() {
+//            override fun onCrashHandleStart(crashType: Int,
+//                errorType: String?,
+//                errorMessage: String?,
+//                errorStack: String?): Map<String?, String?> {
+//                val source = when (crashType) {
+//                    0 -> CrashSource.BUGLY_JAVA
+//                    1 -> CrashSource.BUGLY_CAUGHT
+//                    2 -> CrashSource.BUGLY_NATIVE
+//                    else -> CrashSource.EXTERNAL
+//                }
+//                LoggerX.reportExternalCrash(
+//                    source = source,
+//                    crashType = crashType,
+//                    errorType = errorType,
+//                    errorMessage = errorMessage,
+//                    errorStack = errorStack
+//                )
+//                return emptyMap()
+//            }
+//        }
 
 
         LoggerX.setListener(
@@ -55,7 +55,8 @@ class MyApp: Application() {
                 Log.d(TAG, "LoggerX inserted: scope=${entry.scope}, id=${entry.id}, level=${entry.level}, tag=${entry.tag}, message=${entry.message}")
             }
         )
-        CrashReport.initCrashReport(this@MyApp, "e564c7798c", false, userStrategy)
+//        CrashReport.initCrashReport(this@MyApp, "e564c7798c", false, userStrategy)
+        LoggerX.installNativeCrashCapture()
     }
 
     // setCrashListener 处理未上传 CATCH；setLoggerXListener 可选，用于监听每条成功入库日志。

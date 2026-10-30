@@ -35,6 +35,7 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         add(OptionsItem("触发主线程 Java 崩溃", 10))
         add(OptionsItem("触发后台线程 Java 崩溃", 11))
         add(OptionsItem("触发 Bugly Native 崩溃", 12))
+        add(OptionsItem("触发 Native 空指针崩溃", 13))
     }
 
     override fun ActivityMainBinding.initData() { // 启动循环插入日志
@@ -42,6 +43,9 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
 
         val dbFileSize = LoggerX.getDbFileSize()
         LoggerX.COMMON.i("onCreate: $dbFileSize")
+        if (intent.getBooleanExtra("native_crash", false)) {
+            handler.post { DemoNativeCrash.crash() }
+        }
     }
 
     override fun ActivityMainBinding.initListener() {
@@ -60,6 +64,7 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
                 10 -> testJavaCrash()
                 11 -> testBackgroundCrash()
                 12 -> testNativeCrash()
+                13 -> testOwnNativeCrash()
             }
         }
     }
@@ -161,6 +166,11 @@ class MainActivity: AbsBaseActivity<ActivityMainBinding>() {
         LoggerX.traceNativeCall {
             CrashReport.testNativeCrash()
         }
+    }
+
+    fun testOwnNativeCrash() {
+        LoggerX.COMMON.i("即将触发 Native 空指针崩溃")
+        handler.postDelayed({ DemoNativeCrash.crash() }, 300)
     }
 
     fun recordException() {
